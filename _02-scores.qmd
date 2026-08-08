@@ -6,15 +6,17 @@ min_age_gap <- 1/6
 ```
 
 ```{r load-scores}
+pilots_dir <- file.path(levante_dir, "levante-pilots")
+
 # set of runs that are used for IRT model fitting
-runs_filtered_trials <- read_rds(here("01_fetched_data/runs_filtered_trials.rds")) |>
+runs_filtered_trials <- read_rds(here(pilots_dir, "01_fetched_data/runs_filtered_trials.rds")) |>
   mutate(site_label = dataset |> fct_recode(!!!site_labels))
 
 # score from all IRT models
-mod_scores <- read_rds(here("02_scoring_outputs/scores/registry_scores.rds"))
+mod_scores <- read_rds(here(pilots_dir, "02_scoring_outputs/scores/registry_scores.rds"))
 
 # BIC / rxx from all IRT models
-mod_stats <- read_rds(here("02_scoring_outputs/mod_stats.rds"))
+mod_stats <- read_rds(here(pilots_dir, "02_scoring_outputs/mod_stats.rds"))
 
 # filter runs by min/max age
 runs_aged <- runs_filtered_trials |>
@@ -44,7 +46,7 @@ included_mod_scores <- mod_scores |> inner_join(included_runs, by = "run_id") |>
   left_join(task_info)
 
 # scores for SRE (not IRT based)
-sre_scores <- read_rds(here("02_scoring_outputs/scores/scores_custom.rds")) |>
+sre_scores <- read_rds(here(pilots_dir, "02_scoring_outputs/scores/scores_custom.rds")) |>
   filter(item_task == "sre") |>
   select(item_task, run_id, score = metric_value) |>
   inner_join(included_runs, by = "run_id") |>

@@ -64,7 +64,8 @@ library(marginaleffects)
 ```{r settings}
 #| cache: false
 
-source(here("plot_settings.R"))
+levante_dir <- here("../..")
+source(here(levante_dir, "levante-data-meta/plot_settings.R"))
 .scale_colour_site <- scale_colour_ptol
 .scale_fill_site <- scale_fill_ptol
 

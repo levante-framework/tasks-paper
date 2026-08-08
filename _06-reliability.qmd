@@ -1,5 +1,5 @@
 ```{r load-rxx}
-mod_stats <- read_rds(here("02_scoring_outputs/mod_stats.rds"))
+mod_stats <- read_rds(here(pilots_dir, "02_scoring_outputs/mod_stats.rds"))
 
 task_rxx <- mod_stats |>
   rename(item_task = task) |>

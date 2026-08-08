@@ -1,6 +1,6 @@
 ```{r time-summary}
 # compute duration of each run (minutes between first trial and last trial)
-task_data_nested <- read_rds(here("01_fetched_data/task_data_nested.rds"))
+task_data_nested <- read_rds(here(pilots_dir, "01_fetched_data/task_data_nested.rds"))
 task_data <- task_data_nested |> unnest(data)
 time_summary <- task_data |>
   inner_join(included_runs |> select(site_label, run_id, adaptive)) |>

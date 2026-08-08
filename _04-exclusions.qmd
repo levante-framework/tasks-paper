@@ -1,5 +1,5 @@
 ```{r compute-counts}
-run_exclusions <- read_rds(here("01_fetched_data/run_exclusions.rds")) |>
+run_exclusions <- read_rds(here(pilots_dir, "01_fetched_data/run_exclusions.rds")) |>
   mutate(site_label = dataset |> fct_recode(!!!site_labels)) |>
   left_join(task_id_map) |>
   left_join(task_info)
