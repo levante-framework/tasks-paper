@@ -80,7 +80,7 @@ knitr::opts_chunk$set(cache.extra = knitr::rand_seed)
 pval_fmt <- function(x) ifelse(x < .001, "<.001", sub("^0\\.", ".", sprintf("%.3f", x)))
 ```
 
-{{< include _tasks.qmd >}}
+{{< include _01-tasks.qmd >}}
 
 # Introduction
 
@@ -164,7 +164,7 @@ In what follows, we begin by describing the nine LEVANTE core tasks, organized b
 
 We end by discussing future plans for further internationalization and downward extension of the tasks (i.e., adapting them for younger children). Critically, LEVANTE embraces open science values, aiming to create measures and data that are permissively licensed and reusable and extensible by the international research community. These values address our final challenge posed above: the aim of LEVANTE is to minimize barriers to reuse, accelerating progress towards a global science of learning and development. 
 
-{{< include _scores.qmd >}}
+{{< include _02-scores.qmd >}}
 
 # The LEVANTE Core Tasks
 
@@ -180,7 +180,7 @@ Tasks were implemented using jsPsych [@de-leeuw2015] in a common framework. Illu
 
 All tasks are available for demonstration purposes at <https://researcher.levante-network.org>. Source code for the tasks is available at <https://github.com/levante-framework/core-tasks>. Task code and assets are licensed CC-BY-NC 4.0 for non-commercial reuse (including educational use by not-for-profit and governmental entities) with appropriate attribution. Please see the license file available in the repository for more details. Once the researcher management dashboard is completed, interested researchers will be able to create accounts and use the tasks in their own research. 
 
-{{< include _durations.qmd >}}
+{{< include _03-durations.qmd >}}
 
 ```{r}
 #| dependson: time-summary
@@ -355,7 +355,7 @@ ggplot(ages, aes(x = age, fill = site_label)) +
   labs(x = "Age (years)", y = "Number of children")
 ```
 
-{{< include _exclusions.qmd >}}
+{{< include _04-exclusions.qmd >}}
 
 ## Colombia (uniandes-co-bogota and uniandes-co-rural)
 
@@ -441,7 +441,7 @@ inv_explainer |>
 
 # Psychometric properties of tasks
 
-{{< include _age_models.qmd >}}
+{{< include _05-age_models.qmd >}}
 
 ```{r}
 #| dependson: age-mods
@@ -524,7 +524,7 @@ For ease of interpretation, we calculated the zero-order correlations between ag
 One goal for the LEVANTE core tasks is strong reliability both within an individual administration (across test items) and across multiple administrations separated in time. We report on each of these. 
 
 ### Marginal reliability
-{{< include _reliability.qmd >}}
+{{< include _06-reliability.qmd >}}
 
 Marginal reliability, an IRT-based analogue to Cronbach's $\alpha$, quantifies the proportion of true-score variance captured by a test based on the item information function [@thissen2001test]. Unlike classical coefficients, which assume uniform measurement precision across the ability range, marginal reliability incorporates the fact that precision varies across $\theta$ and estimates overall reliability by integrating information across the assumed population distribution [@embretson2013]. In multi-group IRT models, marginal reliability is computed separately for each site-specific sub-model. @tbl-task-rxx reports marginal reliabilities for each task and site from the best-fitting model. Reliabilities were largely acceptable (>.60) [@nunnally1978psychometric], with the exception of the Stories and Hearts and Flowers tasks, which showed lower reliability in several sites.
 
@@ -555,7 +555,7 @@ task_rxx |>
 ```
 
 ### Test-retest reliability
-{{< include _retest.qmd >}}
+{{< include _07-retest.qmd >}}
 
 We were also interested in capturing the extent to which the LEVANTE tasks yield reliable signal across a delay. The mpieva-de pilot site was able to re-administer tasks to a subset of their original participant group with a retest interval of either 3 months (group 1) or 7 months (group 2) approximately. We used this re-administration as an opportunity to collect data with computer adaptive versions of many of the tasks (Sentence Understanding, Pattern Matching, Shape Rotation, Math, and Vocabulary); see below for further details of computer adaptive versions. In addition, for several tasks (Math, Stories, Pattern Matching), we used this opportunity to gather item data about new groups of retest items that were designed to match the content of the original items but vary in their surface forms. For the other tasks, we retested using the same items. 
 
@@ -595,7 +595,7 @@ ggplot(retest_wide_coretask, aes(run_1, run_2, colour = mean_age)) +
 \clearpage
 
 ## Validity
-{{< include _sem.qmd >}}
+{{< include _08-sem.qmd >}}
 
 Assessment of validity for the core tasks was challenging, in part because of the precise issues that motivated us to create the task battery in the first place. No readily available, internationalized measures existed to compare to many of our tasks. Thus, for validation evidence, we rely on the overall construct structure of the core task battery as well as the relations to our gold standard measures for literacy (ROAR-Word, ROAR-Sentence and ROAR-Phoneme) and executive function (MEFS).
 
