@@ -60,7 +60,8 @@ trt_cat_compare <- trt_cat |>
   pivot_wider(names_from = adaptivity, values_from = test_retest_r)
 
 trt_task <- trt |> select(item_task, test_retest_r) |> deframe() |> signif(2)
-trt_range <- trt_task[!(names(trt_task) %in% c("sds", "math"))] |> range()
+# trt_range <- trt_task[!(names(trt_task) %in% c("sds", "math"))] |> range()
+trt_range <- trt_task |> range() |> sprintf(fmt = "%.2f")
 ```
 
 ```{r test-retest-n}

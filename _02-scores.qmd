@@ -1,8 +1,8 @@
 ```{r filter-params}
 # age filter settings
-min_age <- 5
-max_age <- 13
-min_age_gap <- 1/6
+min_age <- 5  # years
+max_age <- 13 # years
+min_age_gap <- 1/6 # years -> 2 months
 ```
 
 ```{r load-scores}

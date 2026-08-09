@@ -256,7 +256,7 @@ For each task we distinguish between trials and IRT items (see @tbl-trial-irt-co
 
 ```{r}
 # get counts of items in IRT models
-all_coefs <- read_rds("02_scoring_outputs/all_coefs.rds")
+all_coefs <- read_rds(here(pilots_dir, "02_scoring_outputs/all_coefs.rds"))
 task_coefs <- all_coefs |>
   filter(model_set == "multigroup_dataset", subset == "all_items",
          invariance == "scalar", itemtype == "rasch") |>
@@ -265,12 +265,12 @@ task_coefs <- all_coefs |>
 irt_items <- task_coefs |> count(item_task, name = "irt_items")
 
 # get counts of items in item banks
-task_items <- read_csv("04_papers/display/task_item-active test items.csv")
+task_items <- read_csv(here("display/task_item-active test items.csv"))
 bank_items <- task_items |>
   rename(item_task = `task_short_name (from task)`) |>
   count(item_task, name = "bank_items")
 
-exclusions <- read_csv("04_papers/display/exclusion-Grid view.csv") |> select(item)
+exclusions <- read_csv(here("display/exclusion-Grid view.csv")) |> select(item)
 coef_df <- task_coefs |>
   filter(!(item_task %in% c("hf", "mg"))) |>
   anti_join(exclusions) |>
@@ -301,7 +301,7 @@ task_trials <- task_data |>
 
 table_items <- irt_items |> left_join(bank_items) |> left_join(task_trials) |>
   left_join(task_info) |>
-  select(task, bank_items, irt_items, max_trials)
+  select(task, bank_items, irt_items, max_trials) |>
   # select(-item_task, -task_category) |>
   # relocate(task, .before = everything()) |>
   arrange(task)
@@ -340,15 +340,18 @@ A key feature of the LEVANTE framework is that all data are fully de-identified,
 ```{r}
 #| dependson: load-scores
 #| label: fig-age-hist
-#| fig-cap: "Overall distributions of ages for each site."
+#| fig-cap: "Overall distributions of participant ages for each site (earliest age is counted for participants with repeat assessments)."
 #| fig-height: 3
 #| fig-width: 8
 
-ages <- coretask_scores |> summarise(age = min(age), .by = c(site_label, user_id))
-site_counts <- ages |> count(site_label)
+ages <- task_scores |> summarise(age = min(age), .by = c(site_label, user_id))
+site_counts <- ages |> count(site_label) |>
+  mutate(site_n = glue("{site_label}\n(n = {n})")) |>
+  select(site_label, site_n) |>
+  deframe()
 
 ggplot(ages, aes(x = age, fill = site_label)) + 
-  facet_wrap(vars(site_label), nrow = 1) + 
+  facet_wrap(vars(site_label), nrow = 1, labeller = as_labeller(site_counts)) + 
   geom_histogram(binwidth = 1, color = "white") +
   .scale_fill_site(guide = "none") +
   scale_x_continuous(breaks = 5:13) +
@@ -394,9 +397,9 @@ Following item screening, we evaluated measurement invariance across sites using
 
 All models were estimated using the `mirt` R package [@mirt] via marginal maximum likelihood using 500 quadrature points, with expected a posteriori (EAP) scoring. Overlapping items across languages served as anchors to establish a common scale; non-overlapping items were freely estimated within the same multi-group calibration. Model convergence and identification were verified by ensuring stable log-likelihoods and Hessian condition numbers below $10^3$. We specified Gaussian priors on item difficulty (mean = 0, SD = 3) and discrimination (mean = 1, SD = 0.3) parameters in all models.
 
-Model selection was based on the Bayesian Information Criterion (BIC), with the final model for each task representing the most parsimonious combination of model type (Rasch, 2PL) and invariance constraints that adequately reproduced cross-site response patterns. Across domains, Rasch models generally provided the best fit, whereas 2PL models were preferred for Same and Different and Shape Rotation, which showed greater variability of discrimination parameters across items.
+Model selection was based on the Bayesian Information Criterion (BIC), with the final model for each task representing the most parsimonious combination of model type (Rasch, 2PL) and invariance constraints that adequately reproduced cross-site response patterns. Across domains, Rasch models generally provided the best fit, whereas 2PL models were preferred for Shape Rotation, which showed greater variability of discrimination parameters across items.
 
-As shown in @tbl-task-rxx, seven tasks -- Hearts and Flowers, Same and Different, Sentence Understanding, Pattern Matching, Shape Rotation, Math, and Memory -- reached scalar invariance, indicating that both discrimination and difficulty parameters were comparable across sites. Two tasks -- Stories and Vocabulary -- showed configural invariance, suggesting a shared latent construct with certain parameters differing across groups.
+As shown in @tbl-task-rxx, all but one tasks reached scalar invariance, indicating that both discrimination and difficulty parameters were comparable across sites. The exception was Vocabulary, which showed configural invariance, suggesting a shared latent construct with certain parameters differing across groups.
 
 Overall, these results suggest that most tasks showed good measurement equivalence across sites. The final multi-group calibrations provided a common metric for subsequent ability estimation.
 
@@ -411,7 +414,7 @@ Individual ability scores $\theta$ were estimated from the final multi-group cal
 #| ft.arraystretch: 1.2
 
 # read and lightly normalize columns
-inv_explainer <- read_csv(here("04_papers/display/invariance.csv")) |>
+inv_explainer <- read_csv(here("display/invariance.csv")) |>
   mutate(across(everything(), \(v) replace_na(v, "–"))) |>
   relocate(mirt, .after = model)
 
@@ -524,18 +527,18 @@ For ease of interpretation, we calculated the zero-order correlations between ag
 
 One goal for the LEVANTE core tasks is strong reliability both within an individual administration (across test items) and across multiple administrations separated in time. We report on each of these. 
 
-### Marginal reliability
+### Empirical reliability
 {{< include _06-reliability.qmd >}}
 
-Marginal reliability, an IRT-based analogue to Cronbach's $\alpha$, quantifies the proportion of true-score variance captured by a test based on the item information function [@thissen2001test]. Unlike classical coefficients, which assume uniform measurement precision across the ability range, marginal reliability incorporates the fact that precision varies across $\theta$ and estimates overall reliability by integrating information across the assumed population distribution [@embretson2013]. In multi-group IRT models, marginal reliability is computed separately for each site-specific sub-model. @tbl-task-rxx reports marginal reliabilities for each task and site from the best-fitting model. Reliabilities were largely acceptable (>.60) [@nunnally1978psychometric], with the exception of the Stories and Hearts and Flowers tasks, which showed lower reliability in several sites.
+Empirical reliability, an IRT-based analogue to Cronbach's $\alpha$, quantifies the proportion of true-score variance captured by a test based on the item information function [@thissen2001test]. Unlike classical coefficients, which assume uniform measurement precision across the ability range, marginal reliability incorporates the fact that precision varies across $\theta$ and estimates overall reliability by integrating information across the population distribution [@embretson2013]. In multi-group IRT models, empirical reliability is computed separately for each site-specific sub-model. @tbl-task-rxx reports empirical reliabilities for each task and site from the best-fitting model. Reliabilities were largely acceptable (>.60) [@nunnally1978psychometric], with the exception of the Stories task, which showed slightly lower reliability in several sites.
 
 ```{r}
 #| label: tbl-task-rxx
-#| tbl-cap: "Marginal reliabilities for each task and site for tasks with scalar invariance"
+#| tbl-cap: "Empirical reliabilities for each task and site for tasks with scalar invariance"
 
 task_rxx |>
   filter(invariance != "Configural") |>
-  pivot_wider(names_from = group_label, values_from = rxx) |>
+  pivot_wider(names_from = group_label, values_from = empirical_rxx) |>
   flextable() |>
   set_header_labels("task" = "Task", "itemtype" = "Model", "invariance" = "Invariance") |>
   align_text_col() |>
@@ -544,11 +547,11 @@ task_rxx |>
 
 ```{r}
 #| label: tbl-task-rxx-config
-#| tbl-cap: "Marginal reliabilities for each task and site for tasks with configural inariance."
+#| tbl-cap: "Empirical reliabilities for each task and language for tasks with configural inariance."
 
 task_rxx |>
   filter(invariance == "Configural") |>
-  pivot_wider(names_from = group_label, values_from = rxx) |>
+  pivot_wider(names_from = group_label, values_from = empirical_rxx) |>
   flextable() |>
   set_header_labels("task" = "Task", "itemtype" = "Model", "invariance" = "Invariance") |>
   align_text_col() |>
@@ -560,7 +563,7 @@ task_rxx |>
 
 We were also interested in capturing the extent to which the LEVANTE tasks yield reliable signal across a delay. The mpieva-de pilot site was able to re-administer tasks to a subset of their original participant group with a retest interval of either 3 months (group 1) or 7 months (group 2) approximately. We used this re-administration as an opportunity to collect data with computer adaptive versions of many of the tasks (Sentence Understanding, Pattern Matching, Shape Rotation, Math, and Vocabulary); see below for further details of computer adaptive versions. In addition, for several tasks (Math, Stories, Pattern Matching), we used this opportunity to gather item data about new groups of retest items that were designed to match the content of the original items but vary in their surface forms. For the other tasks, we retested using the same items. 
 
-@fig-retest shows the relations between time 1 and time 2 scores. Across individual tasks, retest sample sizes ranged from N = `r min(trt$n)` to N = `r max(trt$n)`; the low number of repeat administrations for Sentence Understanding reflects an error in which this task was not sent to younger children. Children in the test–retest subsample were very similar in age to those in the overall mpieva-de pilot sample. The overall sample (n = `r age_comp$gen$n`) had a mean age of `r age_comp$gen$mean_age` years (SD = `r age_comp$gen$sd_age`), whereas the test–retest subsample (n = `r age_comp$trt$n`) had a mean age of `r age_comp$trt$mean_age` years (SD = `r age_comp$trt$sd_age`), a difference of approximately `r age_comp$gen$mean_age - age_comp$trt$mean_age` years (~`r 12 * (age_comp$gen$mean_age - age_comp$trt$mean_age)` months). Each figure panel also shows the test-retest correlation and sample size for the corresponding task. Most retest correlations were in the range of $r =$ `{r} paste(trt_range, collapse = "--")`, with two exceptions. (TODO: SDS?) and Math showed higher reliability (`{r} trt_task[["math"]]`) than the other tasks. Under classical test theory assumptions, these test–retest correlations provide an estimate of score reliability that complements the marginal reliabilities reported above [@kline2013handbook].
+@fig-retest shows the relations between time 1 and time 2 scores. Across individual tasks, retest sample sizes ranged from N = `r min(trt$n)` to N = `r max(trt$n)`; the relatively lower number of repeat administrations for Sentence Understanding reflects an error in which this task was not sent to younger children. Children in the test–retest subsample were very similar in age to those in the overall mpieva-de pilot sample. The overall sample (n = `r age_comp$gen$n`) had a mean age of `r age_comp$gen$mean_age` years (SD = `r age_comp$gen$sd_age`), whereas the test–retest subsample (n = `r age_comp$trt$n`) had a mean age of `r age_comp$trt$mean_age` years (SD = `r age_comp$trt$sd_age`), a difference of approximately `r age_comp$gen$mean_age - age_comp$trt$mean_age` years (~`r 12 * (age_comp$gen$mean_age - age_comp$trt$mean_age)` months). Each figure panel also shows the test-retest correlation and sample size for the corresponding task. Retest correlations ranged from $r =$ `{r} trt_range[1]` to $r =$ `{r} trt_range[2]`, with Math showing the highest reliability. Under classical test theory assumptions, these test–retest correlations provide an estimate of score reliability that complements the empirical reliabilities reported above [@kline2013handbook].
 
 ```{r}
 #| label: fig-retest
