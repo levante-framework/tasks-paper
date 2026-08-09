@@ -1,23 +1,18 @@
 ```{r age-mods}
 #| dependson: load-scores
 
-# remove CAT data, remove CO data from memory task
-fixed_only <- coretask_scores |>
-  filter(!adaptive) #|>
-  # filter(!(task == "Memory" & site_label == "uniandes-co")) |> # drop CO Memory
-  # mutate(age_c = age - mean(age))
-contrasts(fixed_only$site_label) <- contr.sum(nlevels(fixed_only$site_label))
+contrasts(coretask_scores$site_label) <- contr.sum(nlevels(coretask_scores$site_label))
 
-age_mods <- fixed_only |>
+age_mods <- coretask_scores |>
   nest(scores = -contains("task")) |>
   mutate(scores = map(scores, \(s) s |> mutate(score = scale(score)[,1]))) |>
   mutate(score_age_mod = map(scores, \(s) lm(score ~ age * site_label, data = s)))
 
-age_seq <- seq(min(fixed_only$age), max(fixed_only$age), length.out = 100)
+age_seq <- seq(min(coretask_scores$age), max(coretask_scores$age), length.out = 100)
 sites_grid <- \(s) {
   datagrid(site_label = s,
            age = age_seq,
-           newdata = fixed_only) |>
+           newdata = coretask_scores) |>
     select(site_label, age) |>
     droplevels()
 }
@@ -76,14 +71,14 @@ age_slopes_dataset <- age_slopes_df |>
 ```{r age-cors}
 #| dependson: age-slopes
 
-age_cors_dataset <- fixed_only |>
+age_cors_dataset <- coretask_scores |>
   nest(data = -c(task, site_label)) |>
   mutate(n = map_int(data, nrow),
          cor_test = map(data, \(d) cor.test(~ score + age, data = d) |> broom::tidy())) |>
   select(task, site_label, cor_test, n) |>
   unnest(cor_test)
 
-age_cors_overall <- fixed_only |>
+age_cors_overall <- coretask_scores |>
   nest(data = -c(task)) |>
   mutate(n = map_int(data, nrow),
          cor_test = map(data, \(d) cor.test(~ score + age, data = d) |> broom::tidy())) |>

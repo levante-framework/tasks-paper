@@ -37,7 +37,7 @@ get_exclusion_counts_site <- \(df, g) {
       count(!!g, .data[[v]]) |>
       rename(value = all_of(v)) |>
       mutate(variable = v, .before = value) |>
-      group_by(variable) |>
+      group_by(!!g, variable) |>
       mutate(prop = n / sum(n)) |>
       ungroup() |>
       filter(value) |>
@@ -75,8 +75,13 @@ filtering_n_p <- filtering_rates |>
   select(site_label, n_p) |>
   deframe()
 
-age_exclusions <- runs_aged |>
-  mutate(ex_age_gap = !ex_age_missing & !ex_age_interval & !(run_id %in% included_runs$run_id)) |>
+run_aged_core <- runs_aged |>
+  left_join(task_id_map) |>
+  filter(item_task %in% core_tasks)
+
+age_exclusions <- run_aged_core |>
+  mutate(ex_age_gap = !ex_age_missing & !ex_age_interval &
+           !(run_id %in% included_runs$run_id)) |>
   select(site_label, task_id, user_id, run_id, starts_with("ex_age"))
 
 age_exclusion_vars <- age_exclusions |> select(starts_with("ex_age")) |> colnames()

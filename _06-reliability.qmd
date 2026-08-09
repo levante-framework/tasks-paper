@@ -19,6 +19,13 @@ task_rxx <- mod_stats |>
     invariance = invariance |> str_to_sentence()
   ) |>
   left_join(task_info) |>
-  select(task, group_label, itemtype, invariance, empirical_rxx) |>
+  select(task, itemtype, invariance, group_label, empirical_rxx) |>
   arrange(task)
+
+task_rxx_tbl <- task_rxx |>
+  mutate(across(c(task, itemtype, invariance),
+                \(s) if_else(task == lag(task) & !is.na(lag(task)), "", s)))
+  # mutate(task = if_else(task == lag(task) & !is.na(lag(task)), "", task),
+  #        itemtype = if_else(itemtype == lag(itemtype) & !is.na(lag(itemtype)), "", itemtype),
+  #        task = if_else(task == lag(task) & !is.na(lag(task)), "", task))
 ```

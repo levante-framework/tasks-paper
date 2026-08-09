@@ -18,12 +18,12 @@ mod_scores <- read_rds(here(pilots_dir, "02_scoring_outputs/scores/registry_scor
 # BIC / rxx from all IRT models
 mod_stats <- read_rds(here(pilots_dir, "02_scoring_outputs/mod_stats.rds"))
 
-# filter runs by min/max age
+# code run age exclusions
 runs_aged <- runs_filtered_trials |>
   mutate(ex_age_missing = is.na(age),
          ex_age_interval = !is.na(age) & (age < min_age | age > max_age))
 
-# filter runs by min age gap
+# filter runs by min/max age and min age gap
 included_runs <- runs_aged |>
   # filter(!is.na(age), age >= min_age, age < max_age)
   filter(!ex_age_missing, !ex_age_interval) |>

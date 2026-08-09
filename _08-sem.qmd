@@ -253,7 +253,7 @@ fit_tbl <- bind_rows(
 ```
 
 ```{r prep-sem-ef}
-mefs <- read_rds(here("02_scoring_outputs/scores/scores_mefs.rds"))
+mefs <- read_rds(here(pilots_dir, "02_scoring_outputs/scores/scores_mefs.rds"))
 mefs_scores <- mefs |>
   filter(metric_type == "standard_score", !is.na(age)) |>
   select(dataset, user_id, item_task, score = metric_value, age) |>
@@ -275,7 +275,7 @@ EF ~ age
 
 fit_ef <- cfa(cfa_ef, data = ef_wide_scores,
               estimator = "MLR", std.lv = TRUE, missing = "fiml")
-summary(fit_ef, fit.measures = TRUE, standardized = TRUE)
+# summary(fit_ef, fit.measures = TRUE, standardized = TRUE)
 #print(fitMeasures(fit_ef, c("cfi","tli","rmsea","srmr", "aic", "bic")))
 ```
 
@@ -395,7 +395,7 @@ Language ~ age
 
 fit_lang <- cfa(cfa_lang, data = lang_wide_scores,
                 estimator = "MLR", std.lv = TRUE, missing = "fiml")
-summary(fit_lang, fit.measures = TRUE, standardized = TRUE)
+# summary(fit_lang, fit.measures = TRUE, standardized = TRUE)
 pe_lang <- parameterEstimates(fit_lang, standardized = TRUE)
 fm_lang <- fitMeasures(fit_lang)
 
