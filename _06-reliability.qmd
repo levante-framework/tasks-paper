@@ -20,12 +20,23 @@ task_rxx <- mod_stats |>
   ) |>
   left_join(task_info) |>
   select(task, itemtype, invariance, group_label, empirical_rxx) |>
-  arrange(task)
-
-task_rxx_tbl <- task_rxx |>
+  arrange(task) |>
   mutate(across(c(task, itemtype, invariance),
                 \(s) if_else(task == lag(task) & !is.na(lag(task)), "", s)))
-  # mutate(task = if_else(task == lag(task) & !is.na(lag(task)), "", task),
-  #        itemtype = if_else(itemtype == lag(itemtype) & !is.na(lag(itemtype)), "", itemtype),
-  #        task = if_else(task == lag(task) & !is.na(lag(task)), "", task))
+
+mod_subgroup_stats <- read_rds(here(pilots_dir, "02_scoring_outputs/mod_subgroup_stats.rds"))
+subgroup_rxx <- mod_subgroup_stats |>
+  # filter(model_type == "singlegroup") |>
+  # filter(group_var == "age_group") |>
+  select(item_task = task, itemtype, invariance, group_var, rxx) |>
+  unnest(rxx) |>
+  pivot_wider(names_from = c(group_var, group), values_from = empirical_rxx,
+              names_sep = "-") |>
+  left_join(task_info) |>
+  arrange(task) |>
+  select(task, itemtype, invariance, where(is.numeric)) |>
+  mutate(
+    itemtype = itemtype |> fct_recode("Rasch" = "rasch", "2PL" = "2pl"),
+    invariance = invariance |> str_to_sentence()
+  )
 ```

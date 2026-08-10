@@ -1,5 +1,5 @@
 ---
-title: "Creation and validation of the LEVANTE core tasks: Internationalized measures of learning and development for children ages 5-12 years"
+title: "Creation and validation of the LEVANTE core tasks: Internationalized measures of learning and development for children ages 5--12 years"
 shorttitle: "LEVANTE Measures"
 
 metadata-files:
@@ -11,7 +11,7 @@ author-note:
     conflict-of-interest: "The author has no conflict of interest to declare."
     financial-support: "This work was supported by the Jacobs Foundation."
 
-abstract: We present the Learning Variability Network Exchange (LEVANTE) core tasks, a set of nine short and engaging tasks designed to assess learning and development in children ages 5--12 years across a wide range of languages and cultures. Using a simple and uniform multi-alternative forced-choice format, these tasks measure constructs including math, executive function, language, reasoning, and social cognition and can be administered on a tablet or computer, both in person and remotely, with all materials openly available. We describe the design and selection of these tasks, and then report on their reliability and validity in a sample of ~2500 children recruited from sites in Colombia, Germany, and Canada. Tasks are scored using multi-group item response theory models, allowing testing for measurement invariance. The parameters of these models can then be used to create computer adaptive versions of the tasks, allowing the entire battery to be given in around an hour. We discuss the use, ongoing refinement, and extension of these tasks in the service of creating an open dataset to describe variability in children's development and learning across contexts.
+abstract: We present the Learning Variability Network Exchange (LEVANTE) core tasks, a set of nine short and engaging tasks designed to assess learning and development in children ages 5--12 years across a wide range of languages and cultures. Using a simple and uniform multi-alternative forced-choice format, these tasks measure constructs including math, executive function, language, reasoning, and social cognition and can be administered on a tablet or computer, both in person and remotely, with all materials openly available. We describe the design and selection of these tasks, and then report on their reliability and validity in a sample of ~2600 children recruited from sites in Colombia, Germany, and Canada. Tasks are scored using multi-group item response theory models, allowing testing for measurement invariance. The parameters of these models can then be used to create computer adaptive versions of the tasks, allowing the entire battery to be given in around an hour. We discuss the use, ongoing refinement, and extension of these tasks in the service of creating an open dataset to describe variability in children's development and learning across contexts.
 
 keywords: ["cognitive development"]
 word-count: true
@@ -371,7 +371,7 @@ Data for the mpieva-de site were collected by the Max Planck Institute for Evolu
 
 ## Canada (western-ca)
 
-Partners at Western University (Ontario) recruited participants from the local community, primarily through online outreach (Facebook advertisements and community group posts), supplemented by posters on neighborhood mailboxes and notices shared via local school newsletters. Interested families voluntarily registered to be included in our participant database. Children were tested individually by a researcher in a dedicated testing space on campus. The western-ca site collected data from `{r} n_users_site[["western-ca"]]` children, aged 5-12 years. Families were primarily recruited from London, Ontario, with a smaller subset from the Greater Toronto Area (GTA), both predominantly urban regions. According to recent census estimates, London residents have a mean education level of some postsecondary education, and the median household income is approximately $80,000 CAD. 
+Partners at Western University (Ontario) recruited participants from the local community, primarily through online outreach (Facebook advertisements and community group posts), supplemented by posters on neighborhood mailboxes and notices shared via local school newsletters. Interested families voluntarily registered to be included in our participant database. Children were tested individually by a researcher in a dedicated testing space on campus. The western-ca site collected data from `{r} n_users_site[["western-ca"]]` children, aged 5--12 years. Families were primarily recruited from London, Ontario, with a smaller subset from the Greater Toronto Area (GTA), both predominantly urban regions. According to recent census estimates, London residents have a mean education level of some postsecondary education, and the median household income is approximately $80,000 CAD. 
 
 ## Data filtering
 
@@ -408,7 +408,7 @@ Prior to fitting psychometric models, we examined item-level performance summari
 
 Following item screening, we evaluated measurement invariance across sites using nested multi-group IRT models to assess the comparability of latent ability estimates. The conventional hierarchy of factor-analytic invariance (configural → metric → scalar) was implemented in the IRT framework as successive equality constraints on item parameters (see @tbl-invariance-explainer for correspondence and interpretation). Configural invariance reflects a shared latent structure, metric invariance constrains item discriminations, and scalar invariance constrains both discriminations and difficulties across sites. For each task, we compared Rasch and two-parameter logistic (2PL) unidimensional models under these nested invariance constraints.
 
-All models were estimated using the `mirt` R package [@mirt] via marginal maximum likelihood using 500 quadrature points, with expected a posteriori (EAP) scoring. Overlapping items across sites served as anchors to potentially establish a common scale; non-overlapping items were freely estimated within the same multi-group calibration. Model convergence and identification were verified by ensuring stable log-likelihoods and Hessian condition numbers below $10^3$. We specified Gaussian priors on item difficulty (mean = 0, SD = 3) and discrimination (mean = 1, SD = 0.3) parameters in all models.
+All IRT models were estimated in R using the `mirt` package [@chalmers2012mirt] via marginal maximum likelihood with 61 quadrature points. To avoid extreme estimates of difficulty and discrimination in sparse data, we specified a Gaussian prior on item difficulty ($\mathcal{N}(0,3)$) for both Rasch and 2PL models, as well as a Gaussian prior on item discrimination ($\mathcal{N}(1,0.3)$) for 2PL models. Overlapping items across sites served as anchors to potentially establish a common scale; non-overlapping items were freely estimated within the same multi-group calibration. We extracted ability scores (θ) using expected a posteriori (EAP) scoring.
 
 Model selection was based on the Bayesian Information Criterion (BIC), with the final model for each task representing the most parsimonious combination of model type (Rasch, 2PL) and invariance constraints that adequately reproduced cross-site response patterns. Across domains, Rasch models generally provided the best fit, whereas 2PL models were preferred for Shape Rotation and Stories, indicating a greater differentiation of discrimination parameters across sites.
 
@@ -555,14 +555,14 @@ One goal for the LEVANTE core tasks is strong reliability both within an individ
 ### Empirical reliability
 {{< include _06-reliability.qmd >}}
 
-Empirical reliability, an IRT-based analogue to Cronbach's $\alpha$, quantifies the proportion of true-score variance captured by a test based on the item information function [@thissen2001test]. Unlike classical coefficients, which assume uniform measurement precision across the ability range, marginal reliability incorporates the fact that precision varies across $\theta$ and estimates overall reliability by integrating information across the population distribution [@embretson2013]. In multi-group IRT models, empirical reliability is computed separately for each site-specific sub-model. @tbl-task-rxx reports empirical reliabilities for each task and site from the best-fitting model. Reliabilities were largely acceptable (>.60) [@nunnally1978psychometric], with the exception of the Stories task, which showed slightly lower reliability in several sites.
+Empirical marginal reliability, an IRT-based analogue to Cronbach's $\alpha$, quantifies the proportion of true-score variance captured by a test based on the item information function [@thissen2001test]. Unlike classical coefficients, which assume uniform measurement precision across the ability range, IRT reliability incorporates the fact that precision varies across $\theta$ and estimates overall reliability by integrating information across the population distribution [@embretson2013]. In multi-group IRT models, empirical reliability is computed separately for each site-specific sub-model. @tbl-task-rxx reports empirical reliabilities for each task and site from the best-fitting model. Reliabilities were largely acceptable (>.60) [@nunnally1978psychometric], with the exception of the Stories task, which showed slightly lower reliability in some sites. Reliabilities did not differ substantially by age group nor by sex (see @tbl-task-subgroup-rxx).
 
 ```{r}
 #| label: tbl-task-rxx
 #| tbl-cap: "Empirical reliabilities for each task by site or language."
 #| ft.arraystretch: 0.9
 
-flextable(task_rxx_tbl) |>
+flextable(task_rxx) |>
   hline(~task == "" & lead(task) != "",
         border = officer::fp_border(color = "lightgrey", width = 0.75)) |>
   # align(align = c("left", "left", "right", "right", "right"), part = "all") |>
@@ -570,6 +570,30 @@ flextable(task_rxx_tbl) |>
   set_header_labels("task" = "Task", "group_label" = "Group",
                     "itemtype" = "Model", "invariance" = "Invariance",
                     "empirical_rxx" = "Empirical reliability") |>
+  align_text_col() |>
+  autofit()
+```
+
+```{r}
+#| label: tbl-task-subgroup-rxx
+#| tbl-cap: "Empirical reliabilities for each task by age group and by sex."
+#| ft.arraystretch: 1
+
+subgroup_cols <- tibble(nm = names(subgroup_rxx)) |>
+  separate_wider_delim(nm, names = c("r1", "r2"), delim = "-",
+                       too_few = "align_start", cols_remove = FALSE) |>
+  mutate(r1 = r1 |> replace_values("itemtype" ~ "model") |>
+           str_replace_all("_", " ") |> str_to_sentence(),
+         r2 = r2 |> str_replace("_", "–"))
+
+flextable(subgroup_rxx) |>
+  split_header(sep = "-") |>
+  set_header_df(mapping = subgroup_cols, key = "nm") |>
+  merge_h(part = "header") |>
+  hline(i = 1, border = gray_border, part = "header") |>
+  hline(i = 1, j = 1:3, border = officer::fp_border(color = "white"), part = "header") |>
+  theme_apa() |>
+  padding(1) |>
   align_text_col() |>
   autofit()
 ```
