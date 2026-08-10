@@ -2,6 +2,7 @@
 #| dependson: load-scores
 
 contrasts(coretask_scores$site_label) <- contr.sum(nlevels(coretask_scores$site_label))
+# fixed_only <- coretask_scores |> filter(!adaptive)
 
 age_mods <- coretask_scores |>
   nest(scores = -contains("task")) |>

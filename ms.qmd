@@ -254,7 +254,7 @@ Assessing social cognition across a wide range of ages is a challenge, and relat
 
 For each task we distinguish between trials and IRT items (see @tbl-trial-irt-counts). Trials refer to individual questions that could be presented to the child (design-level count; e.g., 60 trials in the non-adaptive Hearts & Flowers task). For psychometric analyses, we define a smaller set of IRT items, where repeated trials of the same type are collapsed into a single scored unit and practice or feedback trials are excluded. These IRT items are the units that enter the IRT models and therefore have estimated discrimination and difficulty parameters.
 
-```{r}
+```{r item-counts}
 # get counts of items in IRT models
 all_coefs <- read_rds(here(pilots_dir, "02_scoring_outputs/all_coefs.rds"))
 task_coefs <- all_coefs |>
@@ -390,10 +390,6 @@ age below `{r} min_age` or above `{r} max_age`, `{r} ex_vars_age[["ex_age_interv
 or retest gap below `{r} min_age_gap * 12` months, `{r} ex_vars_age[["ex_age_gap"]]`.
 The resulting final sample consists of a total of `{r} n_runs_scored_site[["all"]]` scores (from `{r} n_users_scored_site[["all"]]` unique children), ranging per task from `{r} min_task` to `{r} max_task`.
 
-```{r}
-# Within the included runs, there were a total of `{r} total_trial_counts$n_trials` trials (`{r} site_trial_counts |> select(site, n_trials) |> deframe() |> collapse_value_list()`), of which `{r} total_trial_counts$excluded` were excluded (`{r} site_trial_counts |> select(site, excluded) |> deframe() |> collapse_value_list()`) due to too fast (<100ms) or too slow (>30s) reaction times. For reasons of space we do not disaggregate these exclusions by task, but note that the task with the highest exclusion rate was Pattern Matching (`{r} percentify(max(task_trial_counts$pct_excluded))` trials excluded), while all the other tasks ranged between `{r} percentify(min(task_trial_counts$pct_excluded))` and `{r} percentify(sort(task_trial_counts$pct_excluded, decreasing = TRUE)[2])` trials excluded.
-```
-
 Note that the exclusion rate during this pilot study -- especially at the first site deployed, uniandes-co-bogota -- are higher than expected due to technical issues with some of the tasks, as well as intermittent connectivity issues.
 
 # Scoring
@@ -408,7 +404,7 @@ Prior to fitting psychometric models, we examined item-level performance summari
 
 Following item screening, we evaluated measurement invariance across sites using nested multi-group IRT models to assess the comparability of latent ability estimates. The conventional hierarchy of factor-analytic invariance (configural → metric → scalar) was implemented in the IRT framework as successive equality constraints on item parameters (see @tbl-invariance-explainer for correspondence and interpretation). Configural invariance reflects a shared latent structure, metric invariance constrains item discriminations, and scalar invariance constrains both discriminations and difficulties across sites. For each task, we compared Rasch and two-parameter logistic (2PL) unidimensional models under these nested invariance constraints.
 
-All IRT models were estimated in R using the `mirt` package [@chalmers2012mirt] via marginal maximum likelihood with 61 quadrature points. To avoid extreme estimates of difficulty and discrimination in sparse data, we specified a Gaussian prior on item difficulty ($\mathcal{N}(0,3)$) for both Rasch and 2PL models, as well as a Gaussian prior on item discrimination ($\mathcal{N}(1,0.3)$) for 2PL models. Overlapping items across sites served as anchors to potentially establish a common scale; non-overlapping items were freely estimated within the same multi-group calibration. We extracted ability scores (θ) using expected a posteriori (EAP) scoring.
+All IRT models were estimated in R using the `mirt` package [@mirt] via marginal maximum likelihood with 61 quadrature points. To avoid extreme estimates of difficulty and discrimination in sparse data, we specified a Gaussian prior on item difficulty ($\mathcal{N}(0,3)$) for both Rasch and 2PL models, as well as a Gaussian prior on item discrimination ($\mathcal{N}(1,0.3)$) for 2PL models. Overlapping items across sites served as anchors to potentially establish a common scale; non-overlapping items were freely estimated within the same multi-group calibration. We extracted ability scores (θ) using expected a posteriori (EAP) scoring.
 
 Model selection was based on the Bayesian Information Criterion (BIC), with the final model for each task representing the most parsimonious combination of model type (Rasch, 2PL) and invariance constraints that adequately reproduced cross-site response patterns. Across domains, Rasch models generally provided the best fit, whereas 2PL models were preferred for Shape Rotation and Stories, indicating a greater differentiation of discrimination parameters across sites.
 
@@ -420,7 +416,7 @@ Overall, these results suggest that most tasks showed good measurement equivalen
 
 ## Score computation
 
-Individual ability scores $\theta$ were estimated from the final multi-group calibrations using the expected-a-posteriori (EAP) method. Scores are expressed on a common latent scale across sites, allowing for direct cross-site comparisons and forming the basis for the developmental sensitivity, reliability, and validity analyses that follow.
+Individual ability scores $\theta$ were estimated from the final multi-group calibrations using the expected a posteriori (EAP) method. For scalar invariant tasks, scores are expressed on a common latent scale across sites, allowing for direct cross-site comparisons and forming the basis for the developmental sensitivity, reliability, and validity analyses that follow.
 
 ::: {.landscape}
 ```{r}
@@ -498,7 +494,7 @@ ggplot(coretask_scores, aes(x = age, y = score, colour = site_label)) +
 ```{r}
 #| dependson: age-slopes
 #| label: fig-age-slopes
-#| fig-cap: "Marginal effect of age across all sites and within each site (non-adaptive data only), representating an increase in standard deviations of ability per year of age."
+#| fig-cap: "Marginal effect of age across all sites and within each site, representating an increase in standard deviations of ability per year of age."
 #| fig-width: 9.5
 #| fig-height: 3
 
@@ -541,9 +537,9 @@ flextable(age_stats_tbl) |>
 
 Our goal for the LEVANTE core tasks is that they are sensitive to developmental change. In cross-sectional data, the age-gradients provide an approximation of how sensitive a task is to developmental differences and may, when longitudinal data are available, capture within-person change. We reiterate here that we do not believe absolute differences between sites are interpretable, because of confounding due to differences in sampling, recruitment, and administration of the tasks; our interest instead is in within-site developmental change.
 
-Across all nine tasks, ability scores were higher at older ages at all sites, indicating robust positive age gradients (see @fig-age-trends). This pattern was particularly pronounced for Vocabulary, Hearts and Flowers, and Math. Age gradients were broadly similar across sites: the panels suggest parallel developmental gradients in cognitive performance, with systematic shifts in mean ability but little evidence that the age-related slope differs markedly by site.
+Across all nine tasks, ability scores were higher at older ages at all sites, indicating robust positive age gradients (see @fig-age-trends). This pattern was particularly pronounced for Math, Vocabulary, and Shape Rotation. Age gradients were broadly similar across sites: the panels suggest parallel developmental gradients in cognitive performance, with systematic shifts in mean ability but little evidence that the age-related slope differs markedly by site.
 
-To quantify the age gradients, we fit ordinary least-squares models for each task predicting ability scores (IRT units) from age with site fixed effects and an age by site interaction, allowing slopes to vary by site. As summarized in @tbl-age-effects and @fig-age-slopes, age-related slopes were positive for all tasks and sites, indicating that older children on average performed better on every measure.
+To quantify the age gradients, we fit ordinary least-squares models for each task predicting scaled ability scores (IRT units) from age with site fixed effects and an age by site interaction, allowing slopes to vary by site. Using the `marginaleffects` package [@marginaleffects], we extracted marginal estimates of age slopes. As summarized in @tbl-age-effects and @fig-age-slopes, age-related slopes were positive for all tasks and sites, indicating that older children on average performed better on every measure.
 
 For ease of interpretation, we calculated the zero-order correlations between age and IRT ability scores for each site. As seen in the right side of @tbl-age-effects, these correlations were almost uniformly positive (_r_ = `r age_cor_range[1]` to `r age_cor_range[2]`, with the except of Same & Different in uniandes-co-rural, which has small sample size), of moderate magnitude across tasks, and broadly similar across sites. In sum, the results of the age-based analyses suggest that the tasks are sensitive to age-related differences and are likely suitable for deployment in longitudinal studies of developmental change.
 
@@ -712,9 +708,9 @@ plot(g_lang)
 
 # Adaptive Task Construction
 
-We have already adapted and piloted several of the LEVANTE core tasks as computer adapted versions, primarily in the mpieva-de and western_ca pilot sites. To date, these include Sentence Understanding, Vocabulary, Shape Rotation, Pattern Matching, Same and Different, and Math. These adaptive versions of the tasks maintain an ability score, $\theta$, as an estimate of the participant's skill level that is updated at the end of each trial. This updated $\theta$ is then used to select an item best suited to their estimated ability, which both improves test-taker experience and yields more information on participant skill per item, allowing for a shorter task with fewer items. See @fig-age-trends-cat for age-related ability trends in the tasks currently using the adaptive format. 
+We have already adapted and piloted several of the LEVANTE core tasks as computer adapted versions, primarily in the mpieva-de and western_ca pilot sites. To date, these include Same & Different, Math, Pattern Matching, Shape Rotation, Sentence Understanding, and Vocabulary.  These adaptive versions of the tasks maintain an ability score, $\theta$, as an estimate of the participant's skill level that is updated at the end of each trial. This updated $\theta$ is then used to select an item best suited to their estimated ability, which both improves test-taker experience and yields more information on participant skill per item, allowing for a shorter task with fewer items. See @fig-age-trends-cat for age-related ability trends in the tasks currently using the adaptive format. 
 
-The CAT tasks use an adaptive algorithm made available by the open source jsCat JavaScript library [@ma2025]. The present LEVANTE CAT implementation varies difficulty and guessing for each item while holding both discrimination and upper asymptote constant at 1. Items are selected based on Maximum Fisher Information, and $\theta$ is updated according to a maximum likelihood estimator, with limits of -6 and 6. The LEVANTE CATs are configurable with respect to the initial value of theta and the conditions for ending the task. The starting $\theta$ is set at 0 for all CAT tasks currently in use, but could in principle be set according to the researcher's prior expectation of participant ability, for example, by using age as a proxy indicator of the initial ability estimate.
+The CAT tasks use an adaptive algorithm made available by the open source JavaScript library jsCat [@ma2025]. The present LEVANTE CAT implementation varies difficulty and guessing for each item while holding both discrimination and upper asymptote constant at 1. Items are selected based on Maximum Fisher Information, and $\theta$ is updated according to a maximum likelihood estimator, with limits of -6 and 6. The LEVANTE CATs are configurable with respect to the initial value of theta and the conditions for ending the task. The starting $\theta$ is set at 0 for all CAT tasks currently in use, but could in principle be set according to the researcher's prior expectation of participant ability, for example, by using age as a proxy indicator of the initial ability estimate.
 
 Current CAT implementations use time-based stopping rules to facilitate group testing so that all children end at approximately the same time. Sentence Understanding, Shape Rotation, and Vocabulary each have time limits currently set to 4 minutes. Pattern Matching was set to 6 minutes to allow for the increased time typically required to complete items in this task. Items in these tasks are presented together in a single block. 
 
@@ -722,21 +718,24 @@ Same and Different and Math are each divided into three blocks presented sequent
 
 ```{r}
 #| label: fig-age-trends-cat
-#| fig-cap: "Age related trends by task for children who completed the adaptive versions."
+#| fig-cap: "Age related trends by task for computer adaptive assessments."
 #| fig-width: 8
 #| fig-height: 8
 
-cat_only <- coretask_scores |>
-  filter(adaptive == TRUE) #, site_label != "uniandes-co") |> # drop Columbia
-  # droplevels()
+cat_only <- coretask_scores |> filter(adaptive)
+cat_counts <- cat_only |> count(task_category, task)
 
-ggplot(cat_only, aes(age, score)) +
+ggplot(cat_only, aes(x = age, y = score)) +
   facet_nested_wrap(vars(task_category, task),
                     nest_line = element_line(), solo_line = TRUE,
                     axes = "x", scales = "free_y") +
+  geom_point(aes(colour = site_label), alpha = 0.3, size = 1) +
   geom_smooth(aes(colour = site_label, group = site_label),
               method = "gam", formula = y ~ s(x, bs = "re"), se = FALSE) +
-  geom_point(aes(colour = site_label), alpha = 0.3, size = 1) +
+  geom_label(data = cat_counts, inherit.aes = FALSE,
+             aes(label = sprintf("N = %s", n)),
+             x = Inf, y = -Inf, hjust = "inward", vjust = "inward",
+             size = 3, colour = "grey30", linewidth = 0) +
   scale_x_continuous(breaks = seq(6, 14, 2)) +
   .scale_colour_site() +
   guides(colour = guide_legend(override.aes = list(shape = NA, linetype = 1, linewidth = 2))) +
@@ -817,30 +816,25 @@ Authors' contributions are detailed on the title page, following the CRediT auth
 #| label: fig-se
 #| fig-cap: "Standard error of IRT ability estimates by ability level for fixed-length versus adaptive versions of the six CAT tasks."
 #| fig-width: 8
-#| fig-height: 5
+#| fig-height: 8
 
 # tasks that have CAT versions 
-tasks_cat <- cat_only |>
-  distinct(task, task_category)
+tasks_cat <- cat_only |> distinct(task, task_category)
 
 ability_scores_cat <- coretask_scores |>
   semi_join(tasks_cat, by = c("task", "task_category")) |>
-  mutate(
-    adaptive = factor(
-      adaptive,
-      levels = c(FALSE, TRUE),
-      labels = c("Fixed-length", "Adaptive (CAT)")
-    )
-  )
+  mutate(adaptive = if_else(adaptive, "Non-adaptive", "Adaptive (CAT)"))
 
 ggplot(ability_scores_cat,
        aes(x = score, y = score_se, colour = adaptive)) +
-  geom_point(alpha = 0.15, size = 0.7) +
-  geom_smooth(se = FALSE, method = "loess") +
-  scale_colour_discrete(na.translate = FALSE) +
   facet_nested_wrap(vars(task_category, task),
                     nest_line = element_line(), solo_line = TRUE,
                     axes = "x", scales = "free_y") +
-  labs(x = "Ability (IRT score)", y = "Standard error", colour = "Administration") +
+  geom_point(alpha = 0.15, size = 0.7) +
+  geom_smooth(method = "gam") +
+  scale_colour_brewer(palette = "Set1") +
+  # scale_colour_discrete(na.translate = FALSE) +
+  labs(x = "Ability (IRT score)", y = "Standard error of ability",
+       colour = "Administration method") +
   theme(legend.position = "bottom")
 ```
