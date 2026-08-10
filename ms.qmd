@@ -611,29 +611,24 @@ We were also interested in capturing the extent to which the LEVANTE tasks yield
 #| fig-width: 8
 #| fig-height: 9
 
-lim <- range(retest_wide$run_1, retest_wide$run_2, finite = TRUE)
-lim <- range(pretty(lim))
-
 ggplot(retest_wide_coretask, aes(run_1, run_2, colour = mean_age)) +
-  facet_nested_wrap(vars(task_category, task), scales = "fixed", axes = "x",
+  facet_nested_wrap(vars(task_category, task), scales = "free", axes = "x",
                     nest_line = element_line(), solo_line = TRUE) +
-  coord_equal(xlim = lim, ylim = lim, expand = FALSE) +
   geom_abline(slope = 1, intercept = 0, colour = "grey60", linetype = "dotted") +
   geom_point(alpha = 0.5, size = 1) +
   geom_smooth(method = "lm", colour = "grey40", linewidth = 0.6) +
   geom_label(data = trt, inherit.aes = FALSE,
              aes(label = sprintf("r = %.2f", test_retest_r)),
-             x = lim[1], y = lim[2], hjust = "inward", vjust = "inward",
+             x = -Inf, y = Inf, hjust = "inward", vjust = "inward",
              size = 3, colour = "grey30", linewidth = 0) +
   geom_label(data = trt, inherit.aes = FALSE,
              aes(label = sprintf("N = %s", n)),
-             x = lim[2], y = lim[1], hjust = "inward", vjust = "inward",
+             x = Inf, y = -Inf, hjust = "inward", vjust = "inward",
              size = 3, colour = "grey30", linewidth = 0) +
   scale_colour_viridis_b(limits = c(5, 13), end = 0.95) +
   guides(colour = guide_coloursteps()) +
   labs(x = "Score 1", y = "Score 2", colour = "Age (years)") +
-  theme(legend.position = "bottom")
-# ggsave("retest.png", width = 8, height = 9)
+  theme(legend.position = "bottom", aspect.ratio = 1)
 ```
 
 \clearpage

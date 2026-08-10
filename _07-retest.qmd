@@ -3,13 +3,14 @@
 
 # subset scores to test-retest sample
 max_age_gap <- 8/12 # 8 months
-retest_scores <- included_mod_scores |>
+retest_scores <- task_scores |>
   filter(site_label == "mpieva-de") |>
   # filter to users with more than one run and small enough age gap between runs
   group_by(user_id, task) |>
   filter(any(run_number > 1)) |>
   filter(all(is.na(age_gap) | age_gap < max_age_gap)) |>
-  ungroup()
+  ungroup() |>
+  filter_out(user_id == "2PAOjnbMxeLxztp2wtuR" & item_task %in% c("trog", "vocab"))
 
 # widen scores per user to separate columns
 retest_wide <- retest_scores |>
