@@ -91,7 +91,10 @@ if (n_improper_or_failed > n_reps * 0.1) {
 }
 ```
 
-```{r subsample-summary}
+```{r}
+#| label: tbl-subsample-robustness
+#| tbl-cap: !expr glue::glue("Three-factor model correlations across equal-size-per-site subsamples, compared to the full-sample estimates. {n_converged} of {n_reps} replicates converged to a proper (admissible) solution and are summarized below.")
+
 full_sample_cors <- extract_cors_3f(fit_3f) |> rename(r_full = r)
 
 subsample_summary <- subsample_results |>
@@ -102,11 +105,24 @@ subsample_summary <- subsample_results |>
   ) |>
   left_join(full_sample_cors, by = "pair")
 
-subsample_summary
+subsample_summary |>
+  mutate(across(where(is.numeric), \(x) round(x, 3))) |>
+  rename(
+    "Factor pair" = pair, "Subsample mean" = r_mean, "Subsample SD" = r_sd,
+    "2.5%" = r_q025, "97.5%" = r_q975, "Full sample" = r_full
+  ) |>
+  flextable() |>
+  autofit() |>
+  align(j = c("Subsample mean", "Subsample SD", "2.5%", "97.5%", "Full sample"), align = "center", part = "all") |>
+  bold(j = "Factor pair", bold = TRUE, part = "body") |>
+  add_header_lines(values = glue::glue("Equal-size-per-site subsampling (n = {n_reps} replicates, n = {n_converged} proper)"))
 ```
 
-```{r subsample-plot}
-#| fig-cap: "Factor correlations from `n_reps` equal-size-per-site subsamples (boxplots) vs. the full-sample estimate (red point), for each pair of first-order factors in the 3-factor model."
+```{r}
+#| label: fig-subsample-robustness
+#| fig-cap: !expr glue::glue("Factor correlations from {n_reps} equal-size-per-site subsamples (boxplots, n = {n_converged} proper solutions) vs. the full-sample estimate (red point), for each pair of first-order factors in the 3-factor model.")
+#| fig-width: 6
+#| fig-height: 4
 
 ggplot(subsample_results, aes(x = pair, y = r)) +
   geom_boxplot(width = .4, outlier.shape = NA) +
@@ -141,10 +157,19 @@ within_site_results <- site_ns |>
 skipped_sites <- site_ns |> filter(n < min_n_for_cfa) |> pull(site_label)
 ```
 
-```{r within-site-summary}
+```{r}
+#| label: tbl-within-site-robustness
+#| tbl-cap: !expr glue::glue("Three-factor model correlations fit separately within each site (no cross-site pooling), for sites where the model produced a proper solution. {length(skipped_sites)} of {nrow(site_ns)} sites are omitted (see text) -- either below the {min_n_for_cfa}-participant threshold or because within-site estimation produced an improper solution.")
+
 within_site_summary <- within_site_results |>
   left_join(full_sample_cors, by = "pair") |>
   select(site_label, pair, r, r_full)
 
-within_site_summary
+within_site_summary |>
+  mutate(across(where(is.numeric), \(x) round(x, 3))) |>
+  rename("Site" = site_label, "Factor pair" = pair, "Within-site r" = r, "Full-sample r" = r_full) |>
+  flextable() |>
+  autofit() |>
+  align(j = c("Within-site r", "Full-sample r"), align = "center", part = "all") |>
+  bold(j = c("Site", "Factor pair"), bold = TRUE, part = "body")
 ```

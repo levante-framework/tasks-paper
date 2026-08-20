@@ -87,7 +87,10 @@ if (!bifactor_proper || nrow(bifactor_neg_var) > 0) {
 }
 ```
 
-```{r bifactor-fit-compare}
+```{r}
+#| label: tbl-bifactor-fit-compare
+#| tbl-cap: "Fit comparison between the correlated three-factor model and the direct bifactor model. Fit indices for the bifactor model are not trustworthy on their own: it is an improper (Heywood-case) solution (see text) and can show spuriously good fit despite being inadmissible."
+
 # Compare the bifactor model against the correlated 3-factor model (fit_3f,
 # from _08-sem.qmd) on fit indices, and (where nested) via a scaled chi-square
 # difference test. The two models are not nested in the strict lavaan sense
@@ -108,6 +111,23 @@ anova_bifactor <- tryCatch(
   anova(fit_3f, fit_bifactor),
   error = function(e) NULL
 )
+
+fit_bifactor_tbl |>
+  mutate(
+    `Chi-square` = round(`Chi-square`, 2),
+    TLI   = round(TLI, 3),
+    CFI   = round(CFI, 3),
+    RMSEA = round(RMSEA, 3),
+    `p-value` = case_when(
+      `p-value` < .001 ~ "< .001",
+      TRUE             ~ format(round(`p-value`, 3), nsmall = 3, trim = TRUE)
+    )
+  ) |>
+  flextable() |>
+  autofit() |>
+  align(j = c("Chi-square", "p-value", "TLI", "CFI", "RMSEA"), align = "center", part = "all") |>
+  bold(j = "Model", bold = TRUE, part = "body") |>
+  add_header_lines(values = "Direct bifactor vs. correlated three-factor model (not directly comparable -- see caption)")
 ```
 
 ```{r bifactor-omega}
@@ -314,7 +334,10 @@ loadings_sl <- first_order_loadings |>
 loadings_sl
 ```
 
-```{r bifactor-indices}
+```{r}
+#| label: tbl-bifactor-indices
+#| tbl-cap: "Explained common variance (ECV) and omega-hierarchical, computed from the Schmid-Leiman-transformed loadings (see text). ECV and omega-HS are per-factor indices of how much of each domain's reliable variance is attributable to the specific factor rather than the general factor g; overall ECV and omega-hierarchical/omega-total (bottom row) describe the battery as a whole."
+
 # ECV (explained common variance) and omega-hierarchical from the SL loadings
 # -- the standard quantitative indices for characterizing how "general-factor-
 # dominated" a battery is (Reise, 2012; Rodriguez, Reise, & Haviland, 2016).
@@ -347,12 +370,38 @@ bifactor_indices_tbl <- tibble(
   value = c(ecv_overall, omega_h, omega_total)
 )
 
-bifactor_indices_tbl
-ecv_by_factor
-omega_hs_by_factor
+# single combined table for the manuscript: per-factor ECV/omega-HS, plus an
+# "Overall" row carrying the battery-wide ECV/omega-hierarchical/omega-total.
+bifactor_indices_combined <- ecv_by_factor |>
+  left_join(omega_hs_by_factor |> select(factor, omega_hs), by = "factor") |>
+  transmute(
+    Factor = str_to_title(factor),
+    ECV = round(ecv, 2),
+    `omega-HS` = round(omega_hs, 2)
+  ) |>
+  bind_rows(tibble(
+    Factor = "Overall",
+    ECV = round(ecv_overall, 2),
+    `omega-HS` = NA_real_
+  )) |>
+  mutate(
+    `omega-hierarchical (g)` = if_else(Factor == "Overall", round(omega_h, 2), NA_real_),
+    `omega-total` = if_else(Factor == "Overall", round(omega_total, 2), NA_real_)
+  )
+
+bifactor_indices_combined |>
+  flextable() |>
+  autofit() |>
+  align(j = c("ECV", "omega-HS", "omega-hierarchical (g)", "omega-total"), align = "center", part = "all") |>
+  bold(j = "Factor", bold = TRUE, part = "body") |>
+  bold(i = ~ Factor == "Overall", part = "body") |>
+  colformat_double(na_str = "—")
 ```
 
-```{r bifactor-methods-comparison}
+```{r}
+#| label: tbl-bifactor-methods-comparison
+#| tbl-cap: "Standardized loadings across four approaches to the bifactor question: the raw (improper) direct bifactor, the boundary-constrained bifactor, the partial bifactor (reasoning-specific factor only, ef/language load only on g), and the Schmid-Leiman-derived general/specific loadings from the second-order model. Blank cells indicate the indicator/factor combination is not part of that model."
+
 # Convergence check across the four approaches: do the (unreliable) direct
 # bifactor loadings, the boundary-constrained bifactor, and the SL-derived
 # loadings agree on the qualitative story (which domains carry real specific
@@ -376,5 +425,19 @@ bifactor_methods_comparison <- loadings_bifactor |>
   ) |>
   arrange(factor, indicator)
 
-bifactor_methods_comparison
+bifactor_methods_comparison |>
+  mutate(across(where(is.numeric), \(x) round(x, 2))) |>
+  rename(
+    Factor = factor, Indicator = indicator,
+    "Direct bifactor" = direct_bifactor,
+    "Constrained bifactor" = constrained_bifactor,
+    "Partial bifactor" = partial_bifactor,
+    "SL general" = schmid_leiman_g,
+    "SL specific" = schmid_leiman_specific
+  ) |>
+  flextable() |>
+  autofit() |>
+  align(j = c("Direct bifactor", "Constrained bifactor", "Partial bifactor", "SL general", "SL specific"), align = "center", part = "all") |>
+  bold(j = c("Factor", "Indicator"), bold = TRUE, part = "body") |>
+  colformat_double(na_str = "")
 ```
