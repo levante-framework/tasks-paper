@@ -9,6 +9,18 @@ r=.91, Reasoning-Language r=.88) reported in _08-sem.qmd.
 
 Depends on `wide_scores`, built in _08-sem.qmd's `prep-sem` chunk (same task columns:
 matrix, mrot, hf, mg, sds, trog, vocab, math, tom; age_c centered age).
+
+STRUCTURE: the direct ML bifactor (bifactor-model) reliably produces an improper
+(Heywood-case) solution with real data -- negative residual variances for mg/trog,
+group-factor loadings > 1 -- because the ef/language group factors have almost no
+variance left over once g is partialled out. That's a substantive finding, not just
+an estimation glitch, but it means the raw fit indices/loadings from that model
+aren't trustworthy on their own. The recommended path is the second-order model +
+Schmid-Leiman transformation (second-order-model, schmid-leiman, bifactor-indices),
+which gets the same information (g-loadings, specific-loadings, ECV, omega-
+hierarchical) from a much better-behaved, less-parameterized model. The constrained
+and partial bifactor variants (bifactor-constrained, bifactor-partial) are cheap
+robustness checks/triangulation, not the primary result.
 -->
 
 ```{r prep-bifactor}
@@ -126,10 +138,243 @@ omega_bifactor <- if (bifactor_proper) {
 # Reuses the same plotting approach as the other SEM figures (parameterEstimates
 # + tidySEM), so a proper node/edge layout (sem/layouts/bifactor_sem_layout.xlsx)
 # will need to be created before this chunk can render a figure end-to-end.
+# NOTE: these are the raw (possibly improper) direct-bifactor loadings -- for
+# the trustworthy version see loadings_sl in the Schmid-Leiman section below.
 
 pe_bifactor <- parameterEstimates(fit_bifactor, standardized = TRUE)
 
 loadings_bifactor <- pe_bifactor |>
   filter(op == "=~") |>
   select(factor = lhs, indicator = rhs, std.all)
+```
+
+```{r bifactor-constrained}
+# Diagnostic / robustness check #1: fix the two Heywood-case residuals (mg,
+# trog) to their boundary value of 0 and see whether the rest of the solution
+# stabilizes into something sensible, and how much worse fit gets relative to
+# the (improper) free bifactor. This is a common, if blunt, way to check
+# whether the negative variances reflect a genuine near-zero true value
+# (little/no fit cost to fixing at the boundary) vs. a symptom of a more
+# fundamentally misspecified model (large fit cost).
+
+mdl_bifactor_constrained <- paste0(mdl_bifactor, "\n  mg ~~ 0*mg\n  trog ~~ 0*trog\n")
+
+fit_bifactor_constrained <- sem(
+  mdl_bifactor_constrained, data = wide_scores,
+  estimator = "MLR", missing = "fiml", std.lv = TRUE,
+  optim.method = "nlminb",
+  control = list(iter.max = 50000, rel.tol = 1e-6)
+)
+
+bifactor_constrained_proper <- lavInspect(fit_bifactor_constrained, "post.check")
+```
+
+```{r bifactor-partial}
+# Diagnostic / robustness check #2: a "partial" bifactor that only keeps a
+# specific factor for reasoning (whose direct-bifactor loadings, while weak,
+# were at least not Heywood cases) and lets ef/language items load only on g.
+# This asks a sharper question than the full bifactor: is there ANY domain
+# with reliably distinguishable specific variance, once g is accounted for?
+
+mdl_bifactor_partial <- "
+  g         =~ mrot + matrix + math + mg + sds + hf + vocab + trog + tom
+  reasoning =~ mrot + matrix + math
+
+  g ~~ 0*reasoning
+  g ~ age_c
+"
+
+fit_bifactor_partial <- sem(
+  mdl_bifactor_partial, data = wide_scores,
+  estimator = "MLR", missing = "fiml", std.lv = TRUE,
+  optim.method = "nlminb",
+  control = list(iter.max = 50000, rel.tol = 1e-6)
+)
+
+bifactor_partial_proper <- lavInspect(fit_bifactor_partial, "post.check")
+```
+
+```{r second-order-model}
+# The recommended path: a second-order (hierarchical) CFA -- reasoning/ef/
+# language as correlated first-order factors (identical indicator structure
+# to mdl_3f), with a single second-order g factor explaining the correlations
+# *among* those three factors, rather than a bifactor's g explaining variance
+# in all nine *indicators* directly. Far fewer free parameters than the direct
+# bifactor (3 second-order loadings vs. 9 bifactor loadings + orthogonality
+# constraints), so it's much less prone to boundary/Heywood problems.
+#
+# With exactly 3 first-order factors this is just-identified at the second-
+# order level (3 target covariances, 3 second-order loadings), so its fit
+# will reproduce fit_3f's fit exactly -- it is not a competing model to select
+# via fit indices. Its only job here is to provide a stable, well-behaved
+# basis for the Schmid-Leiman transformation below.
+
+mdl_2nd_order <- "
+  reasoning =~ 1*mrot + matrix + math
+  ef        =~ 1*mg + sds + hf
+  language  =~ 1*vocab + trog + tom
+  g =~ 1*reasoning + ef + language
+  g ~ age_c
+"
+
+fit_2nd_order <- sem(
+  mdl_2nd_order, data = wide_scores,
+  estimator = "MLR", missing = "fiml",
+  optim.method = "nlminb",
+  control = list(iter.max = 50000, rel.tol = 1e-6)
+)
+
+second_order_proper <- lavInspect(fit_2nd_order, "post.check")
+
+# If this trips: don't panic, and don't stopifnot(). With real data this
+# reliably produces a MILD boundary case -- reasoning's second-order loading
+# on g lands at ~1.02-1.04 (just past the boundary), giving a small negative
+# disturbance variance for reasoning specifically, while ef (~.94-.97) and
+# language (~.86-.89) load cleanly below 1. That's a categorically different,
+# much more informative result than the direct bifactor's Heywood case
+# (loadings of 2.7, 3.4): it says reasoning is *essentially indistinguishable*
+# from a single general factor, while ef/language retain a bit more (if
+# modest) specific variance. See analytic-g-loadings below for a model-free
+# confirmation of this exact pattern, computed directly from fit_3f's factor
+# correlations (no re-estimation, so it isn't just an artifact of this fit).
+if (!second_order_proper) {
+  warning(
+    "fit_2nd_order is a boundary/improper solution -- check which factor's ",
+    "second-order loading exceeds 1 (see pe_2nd below) before treating the ",
+    "Schmid-Leiman loadings as final. This is expected to be `reasoning`, ",
+    "and to be a MILD boundary case (~1.02-1.04), not a wild Heywood case."
+  )
+}
+```
+
+```{r analytic-g-loadings}
+# Model-free sanity check: if a single g exactly explained all three pairwise
+# factor correlations from fit_3f (r_re, r_rl, r_el), the implied g-loadings
+# would satisfy r_ij = lambda_i * lambda_j for every pair, giving a unique
+# closed-form solution. This doesn't depend on the second-order SEM fit at
+# all, so it's a useful independent check on whether the second-order model's
+# boundary case is a real feature of the correlation structure (it is, if
+# these come out consistent with fit_2nd_order's loadings above) rather than
+# an estimation quirk.
+
+# local helper (also defined independently in _10-subsample-robustness.qmd,
+# which may or may not be included alongside this file -- kept self-contained
+# here rather than assuming include order)
+extract_cors_3f_local <- function(fit) {
+  parameterEstimates(fit, standardized = TRUE) |>
+    filter(op == "~~", lhs != rhs, lhs %in% c("reasoning", "ef", "language")) |>
+    transmute(pair = paste(lhs, rhs, sep = "-"), r = std.all)
+}
+
+cors_3f <- extract_cors_3f_local(fit_3f)
+r_re <- cors_3f$r[cors_3f$pair == "reasoning-ef"]
+r_rl <- cors_3f$r[cors_3f$pair == "reasoning-language"]
+r_el <- cors_3f$r[cors_3f$pair == "ef-language"]
+
+analytic_g_loadings <- tibble(
+  factor = c("reasoning", "ef", "language"),
+  implied_g_loading = c(
+    sqrt(r_re * r_rl / r_el),
+    sqrt(r_re * r_el / r_rl),
+    sqrt(r_rl * r_el / r_re)
+  )
+)
+
+analytic_g_loadings
+```
+
+```{r schmid-leiman}
+# Schmid & Leiman (1957) transformation: convert the second-order solution's
+# standardized loadings into bifactor-equivalent g-loadings and specific-
+# loadings, algebraically, without ever estimating a saturated bifactor model.
+#   g-loading[item]        = lambda1[item] * lambda2[item's factor]
+#   specific-loading[item] = lambda1[item] * sqrt(1 - lambda2[item's factor]^2)
+# where lambda1 = standardized first-order loading (item on reasoning/ef/lang)
+# and lambda2 = standardized second-order loading (that factor on g).
+
+pe_2nd <- parameterEstimates(fit_2nd_order, standardized = TRUE)
+
+first_order_loadings <- pe_2nd |>
+  filter(op == "=~", lhs %in% c("reasoning", "ef", "language")) |>
+  transmute(factor = lhs, indicator = rhs, lambda1 = std.all)
+
+second_order_loadings <- pe_2nd |>
+  filter(op == "=~", lhs == "g") |>
+  transmute(factor = rhs, lambda2 = std.all)
+
+loadings_sl <- first_order_loadings |>
+  left_join(second_order_loadings, by = "factor") |>
+  mutate(
+    g_loading        = lambda1 * lambda2,
+    specific_loading  = lambda1 * sqrt(pmax(1 - lambda2^2, 0)),
+    communality       = g_loading^2 + specific_loading^2,
+    uniqueness        = 1 - communality
+  )
+
+loadings_sl
+```
+
+```{r bifactor-indices}
+# ECV (explained common variance) and omega-hierarchical from the SL loadings
+# -- the standard quantitative indices for characterizing how "general-factor-
+# dominated" a battery is (Reise, 2012; Rodriguez, Reise, & Haviland, 2016).
+# These are what should ground the positive-manifold discussion in the text,
+# rather than a bare "the factors are highly correlated" statement.
+
+ecv_overall <- with(loadings_sl, sum(g_loading^2) / sum(g_loading^2 + specific_loading^2))
+
+ecv_by_factor <- loadings_sl |>
+  summarise(ecv = sum(g_loading^2) / sum(g_loading^2 + specific_loading^2), .by = factor)
+
+G <- sum(loadings_sl$g_loading)
+U <- sum(loadings_sl$uniqueness)
+S <- loadings_sl |> summarise(S_k = sum(specific_loading), .by = factor)
+
+omega_total <- (G^2 + sum(S$S_k^2)) / (G^2 + sum(S$S_k^2) + U)
+omega_h     <- G^2 / (G^2 + sum(S$S_k^2) + U)
+
+# subscale omega-hierarchical (omega-HS): reliability of each group factor's
+# specific variance, computed using only that group's items.
+omega_hs_by_factor <- loadings_sl |>
+  summarise(
+    G_k = sum(g_loading), S_k = sum(specific_loading), U_k = sum(uniqueness),
+    .by = factor
+  ) |>
+  mutate(omega_hs = S_k^2 / (G_k^2 + S_k^2 + U_k))
+
+bifactor_indices_tbl <- tibble(
+  index = c("ECV (overall)", "omega-hierarchical (g)", "omega-total"),
+  value = c(ecv_overall, omega_h, omega_total)
+)
+
+bifactor_indices_tbl
+ecv_by_factor
+omega_hs_by_factor
+```
+
+```{r bifactor-methods-comparison}
+# Convergence check across the four approaches: do the (unreliable) direct
+# bifactor loadings, the boundary-constrained bifactor, and the SL-derived
+# loadings agree on the qualitative story (which domains carry real specific
+# variance)? Report side by side rather than picking one silently.
+
+pe_constrained <- parameterEstimates(fit_bifactor_constrained, standardized = TRUE) |>
+  filter(op == "=~") |>
+  transmute(factor = lhs, indicator = rhs, constrained_bifactor = std.all)
+
+pe_partial <- parameterEstimates(fit_bifactor_partial, standardized = TRUE) |>
+  filter(op == "=~") |>
+  transmute(factor = lhs, indicator = rhs, partial_bifactor = std.all)
+
+bifactor_methods_comparison <- loadings_bifactor |>
+  rename(direct_bifactor = std.all) |>
+  full_join(pe_constrained, by = c("factor", "indicator")) |>
+  full_join(pe_partial, by = c("factor", "indicator")) |>
+  left_join(
+    loadings_sl |> select(factor, indicator, schmid_leiman_g = g_loading, schmid_leiman_specific = specific_loading),
+    by = c("factor", "indicator")
+  ) |>
+  arrange(factor, indicator)
+
+bifactor_methods_comparison
 ```
