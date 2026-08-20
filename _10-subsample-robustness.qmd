@@ -22,11 +22,19 @@ _08-sem.qmd. `wide_scores` carries `site_label` as an identifier column (prep_se
 selects it but doesn't pivot on it), so it's available for grouping/subsampling here.
 -->
 
-```{r subsample-prep}
+```{r}
+#| label: tbl-site-ns
 #| dependson: sem-factors
+#| tbl-cap: "Sample sizes by site in the SEM/subsampling analysis sample, smallest to largest. The smallest site's N sets the equal-per-site subsample size used below."
 
 site_ns <- wide_scores |> count(site_label, name = "n") |> arrange(n)
-site_ns
+
+site_ns |>
+  rename(Site = site_label, N = n) |>
+  flextable() |>
+  autofit() |>
+  align(j = "N", align = "center", part = "all") |>
+  bold(j = "Site", bold = TRUE, part = "body")
 
 min_site_n <- min(site_ns$n)
 
@@ -67,6 +75,7 @@ draw_equal_site_subsample <- function(data, n_per_site, seed) {
 
 ```{r subsample-refit}
 #| cache: true
+#| dependson: [tbl-site-ns, subsample-functions]
 
 n_reps <- 200
 
@@ -93,6 +102,7 @@ if (n_improper_or_failed > n_reps * 0.1) {
 
 ```{r}
 #| label: tbl-subsample-robustness
+#| dependson: subsample-refit
 #| tbl-cap: !expr glue::glue("Three-factor model correlations across equal-size-per-site subsamples, compared to the full-sample estimates. {n_converged} of {n_reps} replicates converged to a proper (admissible) solution and are summarized below.")
 
 full_sample_cors <- extract_cors_3f(fit_3f) |> rename(r_full = r)
@@ -120,6 +130,7 @@ subsample_summary |>
 
 ```{r}
 #| label: fig-subsample-robustness
+#| dependson: tbl-subsample-robustness
 #| fig-cap: !expr glue::glue("Factor correlations from {n_reps} equal-size-per-site subsamples (boxplots, n = {n_converged} proper solutions) vs. the full-sample estimate (red point), for each pair of first-order factors in the 3-factor model.")
 #| fig-width: 6
 #| fig-height: 4
@@ -133,6 +144,8 @@ ggplot(subsample_results, aes(x = pair, y = r)) +
 ```
 
 ```{r within-site-fits}
+#| dependson: [tbl-site-ns, subsample-functions]
+
 # Complementary check: fit the same 3-factor model separately within each
 # site (no pooling at all). Sites too small to support a 9-indicator, 3-factor
 # CFA are skipped with a message rather than silently failing.
@@ -159,6 +172,7 @@ skipped_sites <- site_ns |> filter(n < min_n_for_cfa) |> pull(site_label)
 
 ```{r}
 #| label: tbl-within-site-robustness
+#| dependson: [within-site-fits, tbl-subsample-robustness]
 #| tbl-cap: !expr glue::glue("Three-factor model correlations fit separately within each site (no cross-site pooling), for sites where the model produced a proper solution. {length(skipped_sites)} of {nrow(site_ns)} sites are omitted (see text) -- either below the {min_n_for_cfa}-participant threshold or because within-site estimation produced an improper solution.")
 
 within_site_summary <- within_site_results |>

@@ -28,6 +28,8 @@ robustness checks/triangulation, not the primary result.
 ```
 
 ```{r bifactor-model}
+#| dependson: prep-bifactor
+
 # Bifactor model: a general factor g loads on all nine indicators; three
 # orthogonal group factors (reasoning, ef, language) capture variance specific
 # to each domain over and above g. Each group factor keeps >= 3 indicators
@@ -62,6 +64,8 @@ fit_bifactor <- sem(
 ```
 
 ```{r bifactor-propriety-check}
+#| dependson: bifactor-model
+
 # lavInspect(..., "converged") only tells you the optimizer stopped; it says
 # nothing about whether the solution is admissible. Bifactor models routinely
 # "converge" to Heywood cases (negative residual variances, |loading| > 1)
@@ -89,6 +93,7 @@ if (!bifactor_proper || nrow(bifactor_neg_var) > 0) {
 
 ```{r}
 #| label: tbl-bifactor-fit-compare
+#| dependson: bifactor-propriety-check
 #| tbl-cap: "Fit comparison between the correlated three-factor model and the direct bifactor model. Fit indices for the bifactor model are not trustworthy on their own: it is an improper (Heywood-case) solution (see text) and can show spuriously good fit despite being inadmissible."
 
 # Compare the bifactor model against the correlated 3-factor model (fit_3f,
@@ -131,6 +136,8 @@ fit_bifactor_tbl |>
 ```
 
 ```{r bifactor-omega}
+#| dependson: bifactor-propriety-check
+
 # Omega hierarchical / omega subscale: how much reliable variance in each
 # group factor's indicators is attributable to g vs. the group factor itself.
 # High omega-h for g (and low residual omega for the group factors) would
@@ -153,6 +160,8 @@ omega_bifactor <- if (bifactor_proper) {
 ```
 
 ```{r bifactor-loadings-plot}
+#| dependson: bifactor-model
+
 # Standardized loadings on g vs. on each group factor, for a quick visual
 # gut-check of which indicators are mostly "general" vs. mostly "specific."
 # Reuses the same plotting approach as the other SEM figures (parameterEstimates
@@ -169,6 +178,8 @@ loadings_bifactor <- pe_bifactor |>
 ```
 
 ```{r bifactor-constrained}
+#| dependson: bifactor-model
+
 # Diagnostic / robustness check #1: fix the two Heywood-case residuals (mg,
 # trog) to their boundary value of 0 and see whether the rest of the solution
 # stabilizes into something sensible, and how much worse fit gets relative to
@@ -190,6 +201,8 @@ bifactor_constrained_proper <- lavInspect(fit_bifactor_constrained, "post.check"
 ```
 
 ```{r bifactor-partial}
+#| dependson: prep-bifactor
+
 # Diagnostic / robustness check #2: a "partial" bifactor that only keeps a
 # specific factor for reasoning (whose direct-bifactor loadings, while weak,
 # were at least not Heywood cases) and lets ef/language items load only on g.
@@ -215,6 +228,8 @@ bifactor_partial_proper <- lavInspect(fit_bifactor_partial, "post.check")
 ```
 
 ```{r second-order-model}
+#| dependson: prep-bifactor
+
 # The recommended path: a second-order (hierarchical) CFA -- reasoning/ef/
 # language as correlated first-order factors (identical indicator structure
 # to mdl_3f), with a single second-order g factor explaining the correlations
@@ -267,7 +282,11 @@ if (!second_order_proper) {
 }
 ```
 
-```{r analytic-g-loadings}
+```{r}
+#| label: tbl-analytic-g-loadings
+#| dependson: prep-bifactor
+#| tbl-cap: "Model-free implied general-factor loadings, solved directly from the three pairwise factor correlations in the correlated three-factor model (no re-estimation): if a single general factor exactly explained those three correlations, its loading on each first-order factor would have to equal these values. Independently confirms the second-order model's boundary case for Reasoning below."
+
 # Model-free sanity check: if a single g exactly explained all three pairwise
 # factor correlations from fit_3f (r_re, r_rl, r_el), the implied g-loadings
 # would satisfy r_ij = lambda_i * lambda_j for every pair, giving a unique
@@ -300,10 +319,21 @@ analytic_g_loadings <- tibble(
   )
 )
 
-analytic_g_loadings
+analytic_g_loadings |>
+  mutate(
+    Factor = str_to_title(factor),
+    `Implied general-factor loading` = round(implied_g_loading, 3)
+  ) |>
+  select(Factor, `Implied general-factor loading`) |>
+  flextable() |>
+  autofit() |>
+  align(j = "Implied general-factor loading", align = "center", part = "all") |>
+  bold(j = "Factor", bold = TRUE, part = "body")
 ```
 
 ```{r schmid-leiman}
+#| dependson: second-order-model
+
 # Schmid & Leiman (1957) transformation: convert the second-order solution's
 # standardized loadings into bifactor-equivalent g-loadings and specific-
 # loadings, algebraically, without ever estimating a saturated bifactor model.
@@ -331,11 +361,13 @@ loadings_sl <- first_order_loadings |>
     uniqueness        = 1 - communality
   )
 
-loadings_sl
+# not printed here -- fully surfaced (g-loading + specific-loading columns)
+# in @tbl-bifactor-methods-comparison below, alongside the other three methods.
 ```
 
 ```{r}
 #| label: tbl-bifactor-indices
+#| dependson: schmid-leiman
 #| tbl-cap: "Explained common variance (ECV) and omega-hierarchical, computed from the Schmid-Leiman-transformed loadings (see text). ECV and omega-HS are per-factor indices of how much of each domain's reliable variance is attributable to the specific factor rather than the general factor g; overall ECV and omega-hierarchical/omega-total (bottom row) describe the battery as a whole."
 
 # ECV (explained common variance) and omega-hierarchical from the SL loadings
@@ -400,6 +432,7 @@ bifactor_indices_combined |>
 
 ```{r}
 #| label: tbl-bifactor-methods-comparison
+#| dependson: [bifactor-loadings-plot, bifactor-constrained, bifactor-partial, schmid-leiman]
 #| tbl-cap: "Standardized loadings across four approaches to the bifactor question: the raw (improper) direct bifactor, the boundary-constrained bifactor, the partial bifactor (reasoning-specific factor only, ef/language load only on g), and the Schmid-Leiman-derived general/specific loadings from the second-order model. Blank cells indicate the indicator/factor combination is not part of that model."
 
 # Convergence check across the four approaches: do the (unreliable) direct
