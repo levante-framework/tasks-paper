@@ -1,0 +1,135 @@
+<!--
+DRAFT — not yet included in ms.qmd. Wire in with {{< include _09-bifactor.qmd >}}
+after _08-sem.qmd once the new data has been re-pulled and this has been run/checked.
+
+Addresses editor comments + R1.6 ("testing alternative models such as a bifactor
+structure would be appropriate") and the authors' own TODO ("Fit bifactor, more data"),
+in response to the very high 3-factor correlations (EF-Reasoning r=.98, EF-Language
+r=.91, Reasoning-Language r=.88) reported in _08-sem.qmd.
+
+Depends on `wide_scores`, built in _08-sem.qmd's `prep-sem` chunk (same task columns:
+matrix, mrot, hf, mg, sds, trog, vocab, math, tom; age_c centered age).
+-->
+
+```{r prep-bifactor}
+#| dependson: sem-factors
+```
+
+```{r bifactor-model}
+# Bifactor model: a general factor g loads on all nine indicators; three
+# orthogonal group factors (reasoning, ef, language) capture variance specific
+# to each domain over and above g. Each group factor keeps >= 3 indicators
+# (a requirement for bifactor identification), matching the group factors
+# used in the correlated 3-factor model (mdl_3f) in _08-sem.qmd.
+
+mdl_bifactor <- "
+  g         =~ mrot + matrix + math + mg + sds + hf + vocab + trog + tom
+  reasoning =~ mrot + matrix + math
+  ef        =~ mg + sds + hf
+  language  =~ vocab + trog + tom
+
+  # orthogonality: general factor uncorrelated with group factors,
+  # and group factors uncorrelated with each other
+  g ~~ 0*reasoning
+  g ~~ 0*ef
+  g ~~ 0*language
+  reasoning ~~ 0*ef
+  reasoning ~~ 0*language
+  ef        ~~ 0*language
+
+  g ~ age_c
+"
+
+fit_bifactor <- sem(
+  mdl_bifactor, data = wide_scores,
+  estimator = "MLR", missing = "fiml", std.lv = TRUE,
+  optim.method = "nlminb",
+  control = list(iter.max = 50000, rel.tol = 1e-6)
+)
+# summary(fit_bifactor, fit.measures = TRUE, standardized = TRUE)
+```
+
+```{r bifactor-propriety-check}
+# lavInspect(..., "converged") only tells you the optimizer stopped; it says
+# nothing about whether the solution is admissible. Bifactor models routinely
+# "converge" to Heywood cases (negative residual variances, |loading| > 1)
+# when a group factor has little variance left over once g is partialled out
+# -- exactly the failure mode you'd expect if the reviewers' "one general
+# factor" concern is right. Check explicitly rather than trusting convergence.
+
+bifactor_proper <- lavInspect(fit_bifactor, "post.check")
+
+bifactor_neg_var <- parameterEstimates(fit_bifactor, standardized = TRUE) |>
+  filter(op == "~~", lhs == rhs, std.all < 0) |>
+  select(variable = lhs, est, std.all)
+
+if (!bifactor_proper || nrow(bifactor_neg_var) > 0) {
+  warning(
+    "fit_bifactor is an improper solution (post.check = ", bifactor_proper,
+    "). Negative residual variances: ",
+    paste(bifactor_neg_var$variable, collapse = ", "),
+    ". Fit-index comparisons below (CFI/RMSEA/AIC/BIC) are not trustworthy ",
+    "for an inadmissible solution -- report the impropriety itself as the ",
+    "finding, don't just cite the fit indices."
+  )
+}
+```
+
+```{r bifactor-fit-compare}
+# Compare the bifactor model against the correlated 3-factor model (fit_3f,
+# from _08-sem.qmd) on fit indices, and (where nested) via a scaled chi-square
+# difference test. The two models are not nested in the strict lavaan sense
+# (bifactor adds a factor rather than freeing parameters of mdl_3f), so treat
+# the LRT as a secondary check and lean on the fit-index comparison + omega
+# hierarchical below for the actual interpretation.
+#
+# NOTE: if bifactor-propriety-check above flagged fit_bifactor as improper,
+# this comparison is not meaningful as a "which model is better" argument --
+# an inadmissible model can show spuriously good fit indices.
+
+fit_bifactor_tbl <- bind_rows(
+  grab_fit(fit_3f, "Three correlated factors + age"),
+  grab_fit(fit_bifactor, "Bifactor (g + 3 group factors) + age")
+)
+
+anova_bifactor <- tryCatch(
+  anova(fit_3f, fit_bifactor),
+  error = function(e) NULL
+)
+```
+
+```{r bifactor-omega}
+# Omega hierarchical / omega subscale: how much reliable variance in each
+# group factor's indicators is attributable to g vs. the group factor itself.
+# High omega-h for g (and low residual omega for the group factors) would
+# support the "one general developmental factor" reading the reviewers raised;
+# the opposite pattern would support the group factors as distinguishable
+# constructs worth reporting separately.
+
+# semTools::reliability() is deprecated in favor of compRelSEM(); also,
+# omega on an improper (Heywood-case) solution isn't interpretable, so this
+# is only worth reading if bifactor_proper (above) is TRUE.
+omega_bifactor <- if (bifactor_proper) {
+  tryCatch(semTools::compRelSEM(fit_bifactor, higher = "g"), error = function(e) {
+    message("omega calculation failed: ", conditionMessage(e))
+    NULL
+  })
+} else {
+  message("skipping omega: fit_bifactor is an improper solution")
+  NULL
+}
+```
+
+```{r bifactor-loadings-plot}
+# Standardized loadings on g vs. on each group factor, for a quick visual
+# gut-check of which indicators are mostly "general" vs. mostly "specific."
+# Reuses the same plotting approach as the other SEM figures (parameterEstimates
+# + tidySEM), so a proper node/edge layout (sem/layouts/bifactor_sem_layout.xlsx)
+# will need to be created before this chunk can render a figure end-to-end.
+
+pe_bifactor <- parameterEstimates(fit_bifactor, standardized = TRUE)
+
+loadings_bifactor <- pe_bifactor |>
+  filter(op == "=~") |>
+  select(factor = lhs, indicator = rhs, std.all)
+```

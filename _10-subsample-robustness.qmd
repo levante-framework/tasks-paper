@@ -1,0 +1,150 @@
+<!--
+DRAFT — not yet included in ms.qmd. Wire in with {{< include _10-subsample-robustness.qmd >}}
+after _08-sem.qmd (and probably after _09-bifactor.qmd) once the new data has been
+re-pulled and this has been run/checked.
+
+Addresses R1.2 ("the disproportionate # participants across sites is striking
+(~80% come from uniandes-co-bogota)... Check on which analyses are conducted within
+dataset and think about either subsampling CO data or doing within site analysis for
+SEM") and the authors' own note (quoting Ben: "Could also fit on equal-sized subsamples
+and show that parameters and ability scores are essentially unchanged").
+
+Two complementary checks:
+  1. Equal-size-per-site subsampling: repeatedly downsample every site to the size of
+     the smallest site, refit the 3-factor model (mdl_3f, from _08-sem.qmd), and see
+     whether the factor correlations / fit move much from the full-sample estimates.
+  2. Within-site-only fits: fit the same model separately within each site (where N
+     allows) to see whether the correlated-factor structure holds without any
+     cross-site pooling at all.
+
+Depends on `wide_scores`, `mdl_3f`, `fit_3f`, and `grab_fit()`, all built in
+_08-sem.qmd. `wide_scores` carries `site_label` as an identifier column (prep_sem()
+selects it but doesn't pivot on it), so it's available for grouping/subsampling here.
+-->
+
+```{r subsample-prep}
+#| dependson: sem-factors
+
+site_ns <- wide_scores |> count(site_label, name = "n") |> arrange(n)
+site_ns
+
+min_site_n <- min(site_ns$n)
+
+# guard: bail loudly (rather than silently subsampling to ~0) if any site is
+# implausibly small once the new data is in -- adjust threshold as needed.
+stopifnot(min_site_n >= 30)
+```
+
+```{r subsample-functions}
+extract_cors_3f <- function(fit) {
+  parameterEstimates(fit, standardized = TRUE) |>
+    filter(op == "~~", lhs != rhs, lhs %in% c("reasoning", "ef", "language")) |>
+    transmute(pair = paste(lhs, rhs, sep = "-"), r = std.all)
+}
+
+fit_3f_on <- function(data) {
+  sem(mdl_3f, data = data,
+      estimator = "MLR", missing = "fiml", std.lv = TRUE, optim.method = "nlminb",
+      control = list(iter.max = 50000, rel.tol = 1e-6))
+}
+
+# lavInspect(..., "converged") only means the optimizer stopped -- small
+# subsamples (especially per-site fits) can "converge" to an inadmissible
+# solution (non-positive-definite latent covariance matrix, |r| > 1, negative
+# residual variances). Treat those as failures too, not just non-convergence.
+fit_is_proper <- function(fit) {
+  isTRUE(lavInspect(fit, "converged")) && isTRUE(lavInspect(fit, "post.check"))
+}
+
+draw_equal_site_subsample <- function(data, n_per_site, seed) {
+  set.seed(seed)
+  data |>
+    mutate(.row = row_number()) |>
+    slice_sample(n = n_per_site, by = site_label) |>
+    select(-.row)
+}
+```
+
+```{r subsample-refit}
+#| cache: true
+
+n_reps <- 200
+
+subsample_results <- map(seq_len(n_reps), \(i) {
+  sub_data <- draw_equal_site_subsample(wide_scores, min_site_n, seed = i)
+  fit_i <- tryCatch(fit_3f_on(sub_data), error = function(e) NULL)
+  if (is.null(fit_i) || !fit_is_proper(fit_i)) return(NULL)
+  extract_cors_3f(fit_i) |> mutate(rep = i)
+}) |>
+  compact() |>
+  bind_rows()
+
+n_converged <- n_distinct(subsample_results$rep)
+n_improper_or_failed <- n_reps - n_converged
+if (n_improper_or_failed > n_reps * 0.1) {
+  warning(
+    n_improper_or_failed, " of ", n_reps, " subsample replicates failed to ",
+    "fit or produced an improper solution -- that's a substantive result in ",
+    "itself (equal-size-per-site samples may be too small/unstable for this ",
+    "9-indicator model), not just noise to filter out silently."
+  )
+}
+```
+
+```{r subsample-summary}
+full_sample_cors <- extract_cors_3f(fit_3f) |> rename(r_full = r)
+
+subsample_summary <- subsample_results |>
+  summarise(
+    r_mean = mean(r), r_sd = sd(r),
+    r_q025 = quantile(r, .025), r_q975 = quantile(r, .975),
+    .by = pair
+  ) |>
+  left_join(full_sample_cors, by = "pair")
+
+subsample_summary
+```
+
+```{r subsample-plot}
+#| fig-cap: "Factor correlations from `n_reps` equal-size-per-site subsamples (boxplots) vs. the full-sample estimate (red point), for each pair of first-order factors in the 3-factor model."
+
+ggplot(subsample_results, aes(x = pair, y = r)) +
+  geom_boxplot(width = .4, outlier.shape = NA) +
+  geom_jitter(width = .08, alpha = .15, size = .6) +
+  geom_point(data = full_sample_cors, aes(y = r_full), color = "red", size = 2.5) +
+  labs(x = NULL, y = "Factor correlation") +
+  coord_flip()
+```
+
+```{r within-site-fits}
+# Complementary check: fit the same 3-factor model separately within each
+# site (no pooling at all). Sites too small to support a 9-indicator, 3-factor
+# CFA are skipped with a message rather than silently failing.
+
+min_n_for_cfa <- 100  # rough rule of thumb given 9 indicators / 3 factors; revisit once real Ns are known
+
+within_site_results <- site_ns |>
+  filter(n >= min_n_for_cfa) |>
+  pull(site_label) |>
+  map(\(site) {
+    site_data <- wide_scores |> filter(site_label == site)
+    fit_site <- tryCatch(fit_3f_on(site_data), error = function(e) NULL)
+    if (is.null(fit_site) || !fit_is_proper(fit_site)) {
+      message(glue::glue("within-site 3-factor model did not converge or was improper for {site}"))
+      return(NULL)
+    }
+    extract_cors_3f(fit_site) |> mutate(site_label = site)
+  }) |>
+  compact() |>
+  bind_rows()
+
+skipped_sites <- site_ns |> filter(n < min_n_for_cfa) |> pull(site_label)
+```
+
+```{r within-site-summary}
+within_site_summary <- within_site_results |>
+  left_join(full_sample_cors, by = "pair") |>
+  select(site_label, pair, r, r_full)
+
+within_site_summary
+```
