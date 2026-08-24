@@ -1,13 +1,9 @@
 <!--
-DRAFT — not yet included in ms.qmd. Wire in with {{< include _10-subsample-robustness.qmd >}}
-after _08-sem.qmd (and probably after _09-bifactor.qmd) once the new data has been
-re-pulled and this has been run/checked.
-
-Addresses R1.2 ("the disproportionate # participants across sites is striking
+Reviewer comment: "the disproportionate # participants across sites is striking
 (~80% come from uniandes-co-bogota)... Check on which analyses are conducted within
 dataset and think about either subsampling CO data or doing within site analysis for
-SEM") and the authors' own note (quoting Ben: "Could also fit on equal-sized subsamples
-and show that parameters and ability scores are essentially unchanged").
+SEM"). Author's note ("Could also fit on equal-sized subsamples and show that 
+parameters and ability scores are essentially unchanged").
 
 Two complementary checks:
   1. Equal-size-per-site subsampling: repeatedly downsample every site to the size of
