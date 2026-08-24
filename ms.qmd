@@ -305,6 +305,8 @@ table_items <- irt_items |> left_join(bank_items) |> left_join(task_trials) |>
   # select(-item_task, -task_category) |>
   # relocate(task, .before = everything()) |>
   arrange(task)
+# GK FixMe: I'd argue H&F has 2 bank_items (not NA) - flowers and hearts trials..
+# and I'm confused why Math has fewer bank items than IRT items...
 ```
 
 ```{r}
@@ -389,7 +391,7 @@ age missing, `{r} ex_vars_age[["ex_age_missing"]]`;
 age below `{r} min_age` or above `{r} max_age`, `{r} ex_vars_age[["ex_age_interval"]]`;
 or retest gap below `{r} min_age_gap * 12` months, `{r} ex_vars_age[["ex_age_gap"]]`.
 The resulting final sample consists of a total of `{r} n_runs_scored_site[["all"]]` scores (from `{r} n_users_scored_site[["all"]]` unique children), ranging per task from `{r} min_task` to `{r} max_task`.
-Reflecting the pilot nature of this data collection, sample sizes and exclusion rates are imbalanced across sites: uniandes-co-bogota contributes the majority of the pooled sample reflecting that data collection began there first and expanded rapidly, but also saw a higher exclusion rate due to technical issues in early releases of the software, and intermittent connectivity issues (the latter more so in uniandes-co-rural). 
+Reflecting the pilot nature of this data collection, sample sizes and exclusion rates are imbalanced across sites: uniandes-co-bogota contributes the majority of the pooled sample reflecting that data collection began there first and expanded rapidly.
 We evaluate the impact of this imbalance using equal-size-per-site subsampling in the Construct Validity section.
 
 # Scoring
