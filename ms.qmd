@@ -596,6 +596,8 @@ flextable(subgroup_rxx) |>
   autofit()
 ```
 
+\clearpage
+
 ### Test-retest reliability
 {{< include _07-retest.qmd >}}
 
@@ -633,7 +635,6 @@ ggplot(retest_wide_coretask, aes(run_1, run_2, colour = mean_age)) +
 
 ## Validity
 {{< include _08-sem.qmd >}}
-{{< include _09-bifactor.qmd >}}
 {{< include _10-subsample-robustness.qmd >}}
 
 Assessment of validity for the core tasks was challenging, in part because of the precise issues that motivated us to create the task battery in the first place. No readily available, internationalized measures existed to compare to many of our tasks. Thus, for validation evidence, we rely on the overall construct structure of the core task battery as well as the relations to our gold standard measures for literacy (ROAR-Word, ROAR-Sentence and ROAR-Phoneme) and executive function (MEFS).
@@ -681,7 +682,7 @@ fit_tbl |>
 
 \clearpage
 
-Given the very high inter-factor correlations reported above, we investigated whether a bifactor structure (i.e., a single general factor alongside domain-specific factors) might better characterize the data. A direct bifactor model, with a general factor loading on all nine indicators alongside orthogonal reasoning-, EF-, and language-specific factors, produced an improper solution (negative residual variances for two indicators; @tbl-bifactor-fit-compare), which is a common outcome when specific factors carry little variance beyond a dominant general factor. We therefore estimated the equivalent decomposition via a second-order model (three correlated first-order factors loading onto a single second-order *g*) and applied a Schmid-Leiman transformation [@schmid1957development] to recover bifactor-equivalent general- and specific-factor loadings (@tbl-bifactor-methods-comparison). This indicated that Reasoning items are essentially indistinguishable from a general factor (second-order loading $\approx 1.02$, at the boundary of admissibility), while Executive Function (loading = .97) and especially Language (loading = .89) retained modestly more distinguishable variance. Explained common variance (ECV) attributable to the general factor was .91 overall, and omega-hierarchical was .88 -- both above the conventional thresholds (ECV, $\omega_{H} > .7-.8$) for treating a battery as substantially general-factor-dominated in practice [@reise2012rediscovery; @rodriguez2016evaluating]. Subscale-specific reliable variance ($\omega_{HS}$) was near zero for Reasoning and Executive Function (.00 and .05, respectively) but modestly higher for Language (.17; @tbl-bifactor-indices), suggesting that Language retains the most distinguishable signal of the three domains. This pattern is broadly consistent with prior work noting that reasoning and executive function are often difficult to separate empirically, though our inter-factor correlations run higher than comparable estimates reported elsewhere in a twin sample of Texas children (Reasoning–EF *r* = .84, EF–Language *r* = .76, Reasoning–Language *r* = .75; [@engelhardt2016]), particularly for Language, which is the less expected of the two given that prior work.
+Given the very high inter-factor correlations reported above, we investigated whether a bifactor structure (i.e., a single general factor alongside domain-specific factors) might better characterize the data; see Appendix for the full analysis. A direct bifactor model produced an improper (Heywood-case) solution (@tbl-bifactor-fit-compare), a common outcome when specific factors carry little variance beyond a dominant general factor, so we instead recovered general- and specific-factor loadings via a second-order model with a Schmid-Leiman transformation [@schmid1957development] (@tbl-bifactor-methods-comparison). Reasoning proved essentially indistinguishable from a general factor, while Executive Function and especially Language retained modestly more distinguishable variance. Explained common variance (ECV = .91) and omega-hierarchical ($\omega_{H}$ = .88) both exceeded conventional thresholds for treating the battery as substantially general-factor-dominated in practice [@reise2012rediscovery; @rodriguez2016evaluating] (@tbl-bifactor-indices), though our inter-factor correlations run higher than comparable estimates from a twin sample of Texas children (Reasoning–EF *r* = .84, EF–Language *r* = .76, Reasoning–Language *r* = .75; [@engelhardt2016]), particularly for Language.
 
 This general-factor-dominated pattern does not appear to be an artifact of the pilot sample's site composition: repeating the correlated three-factor model on 200 equal-size-per-site subsamples produced highly consistent factor correlations (Reasoning–EF, Reasoning–Language, EF–Language all within $\pm.02$ of the full-sample estimates on average; @tbl-subsample-robustness, @fig-subsample-robustness), and the same qualitative pattern held, albeit more noisily, within the two individual sites for which within-site model estimation was stable (@tbl-within-site-robustness).
 
@@ -823,6 +824,12 @@ Authors' contributions are detailed on the title page, following the CRediT auth
 
 ::: {#refs}
 :::
+
+# Bifactor and Schmid-Leiman analysis of the core task battery {.appendix #apx-bifactor}
+
+Given the very high inter-factor correlations reported in the Construct Validity section, we investigated whether a bifactor structure -- a single general factor alongside domain-specific factors -- might better characterize the data.
+
+{{< include _09-bifactor.qmd >}}
 
 # Precision of ability estimates {.appendix #apx-irt-se}
 

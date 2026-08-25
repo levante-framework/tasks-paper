@@ -1,7 +1,13 @@
 <!--
+Included as an appendix ({{< include _09-bifactor.qmd >}} under
+"# Bifactor and Schmid-Leiman analysis..." {.appendix #apx-bifactor}, near the
+end of ms.qmd) rather than inline in the main Validity section -- the main text
+carries only a short summary + pointer here, to keep the Construct Validity
+section from running long.
+
 Addresses comments: "testing alternative models such as a bifactor
-structure would be appropriate" in response to the very high 3-factor 
-correlations (EF-Reasoning r=.98, EF-Language r=.91, Reasoning-Language 
+structure would be appropriate" in response to the very high 3-factor
+correlations (EF-Reasoning r=.98, EF-Language r=.91, Reasoning-Language
 r=.88) reported in _08-sem.qmd.
 
 Depends on `wide_scores`, built in _08-sem.qmd's `prep-sem` chunk (same task columns:
