@@ -830,7 +830,7 @@ Given the very high inter-factor correlations reported in the Construct Validity
 
 {{< include _09-bifactor.qmd >}}
 
-# Site-imbalance robustness check {.appendix #apx-subsample}
+# Site-imbalance robustness check {#apx-subsample}
 
 Sample sizes are imbalanced across the pilot sites (see Data filtering), which raises the concern that the correlated three-factor model's high inter-factor correlations, and the bifactor results in Appendix, could be an artifact of pooling over unevenly-sized, unevenly-composed sites rather than a genuine feature of the tasks. We evaluate this directly with two complementary checks: repeatedly refitting the three-factor model on equal-size-per-site subsamples, and refitting it separately within each individual site (no cross-site pooling at all).
 
