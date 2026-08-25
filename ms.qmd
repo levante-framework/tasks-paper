@@ -635,7 +635,6 @@ ggplot(retest_wide_coretask, aes(run_1, run_2, colour = mean_age)) +
 
 ## Validity
 {{< include _08-sem.qmd >}}
-{{< include _10-subsample-robustness.qmd >}}
 
 Assessment of validity for the core tasks was challenging, in part because of the precise issues that motivated us to create the task battery in the first place. No readily available, internationalized measures existed to compare to many of our tasks. Thus, for validation evidence, we rely on the overall construct structure of the core task battery as well as the relations to our gold standard measures for literacy (ROAR-Word, ROAR-Sentence and ROAR-Phoneme) and executive function (MEFS).
 
@@ -684,7 +683,7 @@ fit_tbl |>
 
 Given the very high inter-factor correlations reported above, we investigated whether a bifactor structure (i.e., a single general factor alongside domain-specific factors) might better characterize the data; see Appendix for the full analysis. A direct bifactor model produced an improper (Heywood-case) solution (@tbl-bifactor-fit-compare), a common outcome when specific factors carry little variance beyond a dominant general factor, so we instead recovered general- and specific-factor loadings via a second-order model with a Schmid-Leiman transformation [@schmid1957development] (@tbl-bifactor-methods-comparison). Reasoning proved essentially indistinguishable from a general factor, while Executive Function and especially Language retained modestly more distinguishable variance. Explained common variance (ECV = .91) and omega-hierarchical ($\omega_{H}$ = .88) both exceeded conventional thresholds for treating the battery as substantially general-factor-dominated in practice [@reise2012rediscovery; @rodriguez2016evaluating] (@tbl-bifactor-indices), though our inter-factor correlations run higher than comparable estimates from a twin sample of Texas children (Reasoning–EF *r* = .84, EF–Language *r* = .76, Reasoning–Language *r* = .75; [@engelhardt2016]), particularly for Language.
 
-This general-factor-dominated pattern does not appear to be an artifact of the pilot sample's site composition: repeating the correlated three-factor model on 200 equal-size-per-site subsamples produced highly consistent factor correlations (Reasoning–EF, Reasoning–Language, EF–Language all within $\pm.02$ of the full-sample estimates on average; @tbl-subsample-robustness, @fig-subsample-robustness), and the same qualitative pattern held, albeit more noisily, within the two individual sites for which within-site model estimation was stable (@tbl-within-site-robustness).
+This general-factor-dominated pattern does not appear to be an artifact of the pilot sample's site composition: repeating the correlated three-factor model on 200 equal-size-per-site subsamples produced highly consistent factor correlations (Reasoning–EF, Reasoning–Language, EF–Language all within $\pm.02$ of the full-sample estimates on average; @tbl-subsample-robustness, @fig-subsample-robustness in the appendix), and the same qualitative pattern held, albeit more noisily, within the two individual sites for which within-site model estimation was stable (@tbl-within-site-robustness).
 
 ### External validity
 
@@ -830,6 +829,12 @@ Authors' contributions are detailed on the title page, following the CRediT auth
 Given the very high inter-factor correlations reported in the Construct Validity section, we investigated whether a bifactor structure -- a single general factor alongside domain-specific factors -- might better characterize the data.
 
 {{< include _09-bifactor.qmd >}}
+
+# Site-imbalance robustness check {.appendix #apx-subsample}
+
+Sample sizes are imbalanced across the pilot sites (see Data filtering), which raises the concern that the correlated three-factor model's high inter-factor correlations, and the bifactor results in Appendix, could be an artifact of pooling over unevenly-sized, unevenly-composed sites rather than a genuine feature of the tasks. We evaluate this directly with two complementary checks: repeatedly refitting the three-factor model on equal-size-per-site subsamples, and refitting it separately within each individual site (no cross-site pooling at all).
+
+{{< include _10-subsample-robustness.qmd >}}
 
 # Precision of ability estimates {.appendix #apx-irt-se}
 
