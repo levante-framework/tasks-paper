@@ -160,7 +160,7 @@ within_site_results <- site_ns |>
   compact() |>
   bind_rows()
 
-skipped_sites <- site_ns |> filter(n < min_n_for_cfa) |> pull(site_label)
+skipped_sites <- site_ns |> filter(!site_label %in% within_site_results$site_label) |> pull(site_label)
 ```
 
 ```{r}
