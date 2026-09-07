@@ -121,7 +121,7 @@ subsample_summary |>
   add_header_lines(values = glue::glue("Equal-size-per-site subsampling (n = {n_reps} replicates, n = {n_converged} proper)"))
 ```
 
-```{r}
+```{r, fig.width=4.5}
 #| label: fig-subsample-robustness
 #| dependson: tbl-subsample-robustness
 #| fig-cap: !expr glue::glue("Factor correlations from {n_reps} equal-size-per-site subsamples (boxplots, n = {n_converged} proper solutions) vs. the full-sample estimate (red point), for each pair of first-order factors in the 3-factor model.")
@@ -143,7 +143,7 @@ ggplot(subsample_results, aes(x = pair, y = r)) +
 # site (no pooling at all). Sites too small to support a 9-indicator, 3-factor
 # CFA are skipped with a message rather than silently failing.
 
-min_n_for_cfa <- 100  # rough rule of thumb given 9 indicators / 3 factors; revisit once real Ns are known
+min_n_for_cfa <- 100  # rough rule of thumb given 9 indicators / 3 factors; revisit?
 
 within_site_results <- site_ns |>
   filter(n >= min_n_for_cfa) |>
