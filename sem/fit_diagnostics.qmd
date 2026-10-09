@@ -1,0 +1,1393 @@
+---
+title: "Construct-validity SEM: fit diagnostics"
+subtitle: "Reviewer response support — are the misfit and the high factor correlations statistical artifacts?"
+author: "LEVANTE core tasks manuscript"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: true
+    code-fold: true
+    code-tools: true
+    df-print: paged
+execute:
+  echo: true
+  message: false
+  warning: false
+  cache: true
+knitr:
+  opts_chunk:
+    comment: "#>"
+---
+
+<!--
+=============================================================================
+NOT PART OF THE MANUSCRIPT RENDER SEQUENCE.
+
+ms.qmd pulls in its sections with explicit `{{< include _NN-*.qmd >}}`
+directives, and this repo has no _quarto.yml, so there is no project-level
+glob that would sweep this file into a render. It is built on its own:
+
+    quarto render sem/fit_diagnostics.qmd
+
+If a _quarto.yml is ever added to this repo, add an exclusion so that stays
+true, e.g.
+
+    project:
+      render:
+        - "!sem/"
+
+WHAT THIS IS FOR
+Both reviewers flagged the Construct Validity SEM: overall fit below
+conventional thresholds, and very high correlations among Reasoning,
+Executive Function, and Language. Before leaning on the general-factor /
+bifactor reading written up in _09-bifactor.qmd, this notebook checks whether
+the misfit and the high correlations could instead be statistical artifacts.
+
+It re-runs the real models from _08-sem.qmd -- it does not rebuild a
+stand-in version of them. The chunks that construct `wide_scores`,
+`fit_cov_age`, and `fit_3f` are read straight out of _01-tasks.qmd,
+_02-scores.qmd, and _08-sem.qmd and evaluated here, so df, chi-square, N,
+loadings, and factor correlations are the manuscript's own numbers and stay
+in sync if those files change.
+=============================================================================
+-->
+
+```{r setup}
+#| cache: false
+
+library(here)
+
+# Everything below assumes the repo root as the working directory: the chunks
+# we borrow from _08-sem.qmd use paths like "sem/layouts/..." that are written
+# relative to where ms.qmd renders from, not relative to this file's folder.
+knitr::opts_knit$set(root.dir = here::here())
+```
+
+```{r libraries}
+#| cache: false
+
+library(tidyverse)
+library(glue)
+library(lavaan)
+library(MASS, include.only = "mvrnorm")
+
+# Needed only by the chunks borrowed from _10-subsample-robustness.qmd in
+# Check 4, which format their output with flextable.
+library(flextable)
+
+theme_set(theme_minimal(base_size = 11))
+```
+
+## Knobs
+
+Replication counts are set here. All simulations are seeded, so a given
+setting reproduces exactly.
+
+The defaults require approximately 5,000 model fits (roughly 40 minutes),
+dominated by the sample-size sweep in Check 2. Chunks are cached, so
+re-rendering repeats only what changed. Reduced settings (60 and 40
+replicates, two-point sweep) complete in a few minutes and yield the same
+qualitative conclusions.
+
+```{r knobs}
+#| cache: false
+
+N_REPS_NULL  <- 500   # replicates per null-fit simulation (check 1 & 2)
+N_REPS_ME    <- 300   # replicates per measurement-error condition (check 3)
+SEED         <- 20260207
+
+# Sample sizes used for the "does N drive the fit indices?" sweep in check 2.
+# The real analysis N is spliced in automatically below.
+N_SWEEP_EXTRA <- c(300, 600, 1200, 4000)
+```
+
+## Rebuilding the manuscript's models
+
+### Locating the sibling repositories
+
+`ms.qmd` sets `levante_dir <- here("../..")` and reads scores from
+`levante-pilots`. This notebook resolves that location rather than hardcoding
+the offset, testing `../..` first so it matches `ms.qmd` where that layout
+holds.
+
+`ms.qmd` also sources `levante-data-meta/plot_settings.R`, which sets ggplot
+themes and palettes only. No chunk used here produces a figure that depends on
+it, so it is sourced if present and skipped otherwise.
+
+```{r locate-levante-dir}
+#| cache: false
+
+find_levante_dir <- function() {
+  candidates <- c(here("../.."), here(".."))
+  has_pilots <- dir.exists(file.path(candidates, "levante-pilots"))
+  if (!any(has_pilots)) {
+    stop(glue(
+      "Could not find `levante-pilots`.\nLooked in:\n",
+      paste0("  - ", normalizePath(candidates, mustWork = FALSE), collapse = "\n"),
+      "\n\nThis notebook reruns the real models from _08-sem.qmd, so it needs ",
+      "the same scores `ms.qmd` reads. Clone levante-pilots next to this repo ",
+      "(or next to its parent) and re-render."
+    ), call. = FALSE)
+  }
+  normalizePath(candidates[has_pilots][1])
+}
+
+levante_dir <- find_levante_dir()
+pilots_dir  <- file.path(levante_dir, "levante-pilots")
+
+# Cosmetic only (ggplot theme + palettes); nothing here depends on it.
+# `_02-scores.qmd` calls `filter_out()`, which comes from dplyr (>= 1.2.0),
+# not from this file.
+# Sourced best-effort: it pulls in ggthemes/sysfonts/showtext, which renv cannot
+# see (they are reached through source(), not a library() call), so a fresh
+# project library may not have them. Nothing below depends on it.
+plot_settings <- file.path(levante_dir, "levante-data-meta", "plot_settings.R")
+if (file.exists(plot_settings)) {
+  tryCatch(source(plot_settings), error = function(e) {
+    message("Skipped plot_settings.R (cosmetic only): ", conditionMessage(e))
+  })
+}
+
+if (packageVersion("dplyr") < "1.2.0") {
+  stop(glue(
+    "dplyr {packageVersion('dplyr')} is too old: `_02-scores.qmd` uses ",
+    "dplyr::filter_out(), added in 1.2.0."
+  ), call. = FALSE)
+}
+
+glue("levante_dir: {levante_dir}")
+```
+
+The scores pipeline reads `levante-pilots/01_fetched_data/`, which is
+gitignored upstream. If it is absent, the next chunk fails; the remedy is to
+re-run the fetch step in `levante-pilots`.
+
+```{r check-inputs}
+#| cache: false
+
+required_inputs <- file.path(pilots_dir, c(
+  "01_fetched_data/runs_filtered_trials.rds",
+  "02_scoring_outputs/scores/registry_scores.rds",
+  "02_scoring_outputs/mod_stats.rds",
+  "02_scoring_outputs/scores/scores_custom.rds"
+))
+
+missing_inputs <- required_inputs[!file.exists(required_inputs)]
+if (length(missing_inputs)) {
+  stop(glue(
+    "Missing upstream input(s):\n",
+    paste0("  - ", missing_inputs, collapse = "\n"),
+    "\n\n`01_fetched_data/` is gitignored in levante-pilots; re-run the data ",
+    "fetch there before rendering this notebook."
+  ), call. = FALSE)
+}
+
+cat("All upstream inputs present.\n")
+```
+
+### Borrowing the real chunks
+
+`read_qmd_chunks()` extracts named chunks from a `.qmd` verbatim. The models
+below are therefore the manuscript's own specifications, and track subsequent
+edits to `_08-sem.qmd` rather than diverging from them.
+
+```{r chunk-reader}
+#| cache: false
+
+read_qmd_chunks <- function(path, labels) {
+  lines <- readLines(path, warn = FALSE)
+  opens <- grep("^```\\{r[ ,}]", lines)
+  closes <- grep("^```[[:space:]]*$", lines)
+
+  found <- map(opens, function(open) {
+    close <- closes[closes > open]
+    if (!length(close)) {
+      stop(glue("Unterminated chunk at {basename(path)}:{open}"), call. = FALSE)
+    }
+    close <- close[1]
+    header <- lines[open]
+    # label from either ```{r my-label, ...} or a #| label: my-label option line
+    label <- str_match(header, "^```\\{r[ ]+([^,}[:space:]]+)")[, 2]
+    body <- if (close > open + 1) lines[(open + 1):(close - 1)] else character(0)
+    if (is.na(label)) {
+      label <- str_match(body, "^#\\|\\s*label:\\s*(\\S+)")[, 2] |>
+        discard(is.na) |>
+        first()
+    }
+    list(label = label, body = body)
+  })
+
+  available <- map_chr(found, \(c) c$label %||% NA_character_)
+  unknown <- setdiff(labels, available)
+  if (length(unknown)) {
+    stop(glue(
+      "Chunk(s) {paste(sQuote(unknown), collapse = ', ')} not found in ",
+      "{basename(path)}. Available: {paste(sQuote(na.omit(available)), collapse = ', ')}.\n",
+      "The upstream file was probably restructured -- update the chunk list ",
+      "in this notebook to match."
+    ), call. = FALSE)
+  }
+
+  found[match(labels, available)]
+}
+
+run_qmd_chunks <- function(path, labels, envir = globalenv()) {
+  for (chunk in read_qmd_chunks(path, labels)) {
+    eval(parse(text = paste(chunk$body, collapse = "\n")), envir = envir)
+  }
+  invisible(labels)
+}
+```
+
+```{r rebuild-models}
+#| cache: false
+
+run_qmd_chunks(here("_01-tasks.qmd"),  "task-info")
+run_qmd_chunks(here("_02-scores.qmd"), c("filter-params", "load-scores"))
+run_qmd_chunks(here("_06-reliability.qmd"), "load-rxx")
+
+# prep-sem      -> wide_scores
+# sem-g-age     -> model_cov_age, fit_cov_age   (the Figure 6 model)
+# sem-factors   -> mdl_1f/2f/3f, fit_1f/2f/3f, fit_tbl, grab_fit()
+#
+# The plotting chunks (sem-g-plot, sem-ef-*, sem-lang-*) are deliberately
+# skipped: they need tidySEM and the Excel layout files and produce nothing
+# these diagnostics use.
+run_qmd_chunks(here("_08-sem.qmd"), c("prep-sem", "sem-g-age", "sem-factors"))
+
+stopifnot(
+  exists("wide_scores"), exists("fit_cov_age"), exists("fit_3f"),
+  lavInspect(fit_cov_age, "converged"), lavInspect(fit_3f, "converged")
+)
+
+glue("wide_scores: {nrow(wide_scores)} rows x {ncol(wide_scores)} cols")
+```
+
+### The two models under discussion
+
+The two reported problems attach to different fitted objects:
+
+- **Overall misfit (CFI, RMSEA): `fit_cov_age`.** The model shown in Figure 6
+  (`fig-semplot-core-tasks`): three first-order factors, Math and Stories as
+  observed endogenous outcomes rather than indicators, and age predicting each
+  factor and outcome. The CFI and RMSEA quoted in the manuscript come from this
+  fit.
+- **Factor correlations: `fit_3f`.** The three-factor comparison model in
+  `@tbl-alt-models`, which treats Math and Stories as indicators of Reasoning
+  and Language. `_09-bifactor.qmd` and `_10-subsample-robustness.qmd` build on
+  this specification.
+
+Checks 1, 2 and 5 target `fit_cov_age`; Checks 3, 4 and 6 target `fit_3f`.
+
+```{r fit-measures-helper}
+#| cache: false
+
+grab_measures <- function(fit, label) {
+  m <- fitMeasures(fit)
+  pick <- function(nm) if (nm %in% names(m)) unname(m[[nm]]) else NA_real_
+  tibble(
+    model        = label,
+    n            = pick("ntotal"),
+    npar         = pick("npar"),
+    df           = pick("df"),
+    chisq        = pick("chisq"),
+    chisq_p      = pick("pvalue"),
+    cfi          = pick("cfi"),
+    cfi_scaled   = pick("cfi.scaled"),
+    tli          = pick("tli"),
+    rmsea        = pick("rmsea"),
+    rmsea_scaled = pick("rmsea.scaled"),
+    rmsea_lo     = pick("rmsea.ci.lower"),
+    rmsea_hi     = pick("rmsea.ci.upper"),
+    rmsea_pclose = pick("rmsea.pvalue"),
+    srmr         = pick("srmr"),
+    chisq_scaled = pick("chisq.scaled"),
+    cfi_robust   = pick("cfi.robust"),
+    rmsea_robust = pick("rmsea.robust")
+  )
+}
+```
+
+```{r fit-summaries}
+real_fits <- bind_rows(
+  grab_measures(fit_cov_age, "fit_cov_age (Figure 6)"),
+  grab_measures(fit_3f,      "fit_3f (Table: alt models)")
+)
+
+real_fits |> mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+Both models are estimated with `MLR`, so `lavaan` reports naive, scaled and
+robust variants of each index. The manuscript quotes the naive values, and the
+simulations below calibrate against those. The scaled values are the
+conventional choice under MLR; here they differ negligibly from the naive ones.
+The robust RMSEA is substantially larger than both, which is a known
+sensitivity of that statistic under FIML with extensive missing data (see
+Check 5) and is not interpreted here.
+
+```{r key-numbers}
+fig6 <- real_fits |> filter(str_starts(model, "fit_cov_age"))
+f3   <- real_fits |> filter(str_starts(model, "fit_3f"))
+
+N_REAL  <- fig6$n
+DF_REAL <- fig6$df
+
+glue(
+  "Figure 6 model: N = {N_REAL}, df = {DF_REAL}, ",
+  "chi-square = {round(fig6$chisq, 1)} (p = {format.pval(fig6$chisq_p, digits = 3)}), ",
+  "CFI = {round(fig6$cfi, 3)}, RMSEA = {round(fig6$rmsea, 3)} ",
+  "[{round(fig6$rmsea_lo, 3)}, {round(fig6$rmsea_hi, 3)}]"
+)
+```
+
+## Simulation machinery
+
+`refit_like()` re-estimates a model on new data using the original `lavaan`
+call, so estimator, missing-data handling, identification and optimizer
+settings are identical between the observed and simulated fits.
+
+```{r sim-helpers}
+#| cache: false
+
+# Re-estimate `fit`'s model on `newdata`, reusing its original lavaan call.
+refit_like <- function(fit, newdata, ...) {
+  cl <- fit@call
+  cl[["data"]] <- quote(.newdata)
+  overrides <- list(...)
+  for (nm in names(overrides)) cl[[nm]] <- overrides[[nm]]
+  .newdata <- newdata
+  eval(cl, envir = environment())
+}
+
+# lavInspect(.., "converged") only tells us the optimizer stopped. Small or
+# unlucky samples can stop at an inadmissible solution (negative residual
+# variances, |r| > 1), which should count as a failure, not a datapoint.
+# Same criterion _10-subsample-robustness.qmd uses.
+# lavaan emits a warning when post.check fails; we are deliberately testing for
+# that, so suppress the warning here and account for the discards instead.
+fit_is_proper <- function(fit) {
+  isTRUE(lavInspect(fit, "converged")) &&
+    isTRUE(suppressWarnings(lavInspect(fit, "post.check")))
+}
+
+# Observed-variable data actually used by a fit, as a data frame (NAs intact).
+model_data <- function(fit) {
+  as.data.frame(lavInspect(fit, "data"))
+}
+```
+
+`simulate_null()` draws samples from a population in which the fitted model
+holds exactly, then refits. Population moments are the fitted model's own
+implied mean and covariance, so population parameter values equal the
+manuscript's estimates. Any misfit in the resulting samples reflects sampling
+variation alone, at the observed df and N.
+
+```{r simulate-null}
+#| cache: false
+
+# Draw from the model-implied moments of `fit` (where the model holds exactly),
+# refit, and return the fit indices. `impose_missing` copies the real
+# missingness pattern onto the simulated data by resampling rows of the real
+# data's NA mask, so simulated samples carry the same information loss the
+# real FIML fit does -- without it, simulated N is effectively larger than real
+# N and the null would be optimistic.
+simulate_null <- function(fit, n_reps, n_obs = NULL, impose_missing = TRUE,
+                          seed = SEED, label = "") {
+  base <- refit_like(fit, model_data(fit), fixed.x = FALSE)
+
+  # fixed.x = FALSE makes exogenous variables (age_c) part of the modelled
+  # moments so the implied covariance covers every observed variable. It adds
+  # parameters and moments in equal number, so df and chi-square are untouched.
+  stopifnot(
+    all.equal(fitMeasures(base)[["df"]],    fitMeasures(fit)[["df"]]),
+    isTRUE(all.equal(fitMeasures(base)[["chisq"]], fitMeasures(fit)[["chisq"]],
+                     tolerance = 1e-4))
+  )
+
+  implied <- lavInspect(base, "implied")
+  Sigma <- as.matrix(implied$cov)
+  mu <- if (!is.null(implied$mean)) as.numeric(implied$mean) else rep(0, ncol(Sigma))
+  vars <- colnames(Sigma)
+
+  template <- model_data(base)[, vars, drop = FALSE]
+  if (is.null(n_obs)) n_obs <- nrow(template)
+
+  stopifnot(setequal(vars, colnames(template)))
+
+  set.seed(seed)
+  reps <- map(seq_len(n_reps), function(i) {
+    sim <- mvrnorm(n_obs, mu = mu, Sigma = Sigma)
+    colnames(sim) <- vars
+    sim <- as.data.frame(sim)
+
+    if (impose_missing) {
+      rows <- sample(nrow(template), n_obs, replace = TRUE)
+      sim[is.na(template[rows, , drop = FALSE])] <- NA_real_
+    }
+
+    fit_i <- tryCatch(refit_like(base, sim, fixed.x = FALSE),
+                      error = function(e) NULL)
+    if (is.null(fit_i) || !fit_is_proper(fit_i)) return(NULL)
+    grab_measures(fit_i, label) |> mutate(rep = i, n_obs = n_obs)
+  })
+
+  n_ok <- sum(!map_lgl(reps, is.null))
+  if (n_ok < n_reps * 0.9) {
+    warning(glue(
+      "{label}: only {n_ok} of {n_reps} replicates produced a proper solution ",
+      "at n = {n_obs}. Treat the summary below as provisional."
+    ))
+  }
+
+  reps |> compact() |> bind_rows() |> mutate(n_attempted = n_reps, n_proper = n_ok)
+}
+```
+
+## Check 1 — Is the RMSEA inflated because the model has few df?
+
+Kenny, Kaniskan and McCoach (2015, *Sociological Methods & Research*) show
+that RMSEA is upwardly biased and unstable when df is small, and recommend
+against reporting it below approximately df = 5. This check establishes whether
+the present model falls in that regime.
+
+```{r check1-df}
+glue("Figure 6 model df = {DF_REAL}")
+```
+
+```{r check1-sim}
+#| dependson: [simulate-null, rebuild-models]
+
+null_fig6 <- simulate_null(
+  fit_cov_age, n_reps = N_REPS_NULL, seed = SEED,
+  label = "fit_cov_age null"
+)
+
+null_summary <- function(sims) {
+  sims |>
+    summarise(
+      across(
+        c(chisq, cfi, rmsea, srmr),
+        list(
+          mean = \(x) mean(x, na.rm = TRUE),
+          median = \(x) median(x, na.rm = TRUE),
+          q95 = \(x) quantile(x, .95, na.rm = TRUE),
+          q99 = \(x) quantile(x, .99, na.rm = TRUE),
+          max = \(x) max(x, na.rm = TRUE)
+        ),
+        .names = "{.col}__{.fn}"
+      ),
+      n_proper = first(n_proper), n_attempted = first(n_attempted)
+    ) |>
+    pivot_longer(contains("__"), names_to = c("index", "stat"), names_sep = "__") |>
+    pivot_wider(names_from = stat, values_from = value)
+}
+
+null_summary(null_fig6) |> mutate(across(where(is.double), \(x) round(x, 4)))
+```
+
+Position of the observed values within the null distribution:
+
+```{r check1-percentile}
+pctile <- function(sims, index, observed) {
+  mean(sims[[index]] >= observed, na.rm = TRUE)
+}
+
+tibble(
+  index = c("rmsea", "cfi", "chisq"),
+  observed = c(fig6$rmsea, fig6$cfi, fig6$chisq),
+  null_median = c(median(null_fig6$rmsea), median(null_fig6$cfi), median(null_fig6$chisq)),
+  p_null_as_extreme = c(
+    pctile(null_fig6, "rmsea", fig6$rmsea),
+    mean(null_fig6$cfi <= fig6$cfi, na.rm = TRUE),   # CFI: worse means lower
+    pctile(null_fig6, "chisq", fig6$chisq)
+  )
+) |>
+  mutate(across(where(is.double), \(x) round(x, 4)))
+```
+
+```{r check1-plot}
+#| fig-width: 7
+#| fig-height: 3
+
+null_fig6 |>
+  dplyr::select(rep, rmsea, cfi) |>
+  pivot_longer(c(rmsea, cfi), names_to = "index", values_to = "value") |>
+  mutate(index = recode(index, rmsea = "RMSEA", cfi = "CFI")) |>
+  ggplot(aes(value)) +
+  geom_histogram(bins = 40, fill = "grey70", colour = "white") +
+  geom_vline(
+    data = tibble(index = c("RMSEA", "CFI"), observed = c(fig6$rmsea, fig6$cfi)),
+    aes(xintercept = observed), colour = "firebrick", linewidth = .8
+  ) +
+  facet_wrap(~index, scales = "free") +
+  labs(
+    x = NULL, y = "Replicates",
+    title = glue("Null distribution at the real df and N (n = {N_REPS_NULL} replicates)"),
+    subtitle = "Red line = value observed in the Figure 6 model"
+  )
+```
+
+**Comparison against a generic population.** An earlier version of this check
+simulated from stylised parameter values (loadings .7, factor correlations .5)
+rather than from the fitted estimates. That variant is retained below, with the
+measurement structure read from the `fit_3f` parameter table.
+
+```{r check1-ordinary}
+#| dependson: rebuild-models
+
+ordinary_population <- function(fit, loading = .7, factor_r = .5) {
+  pe <- parameterEstimates(fit)
+  loadings <- pe |> filter(op == "=~") |> dplyr::select(factor = lhs, indicator = rhs)
+  factors <- unique(loadings$factor)
+  indicators <- unique(loadings$indicator)
+
+  Lambda <- matrix(0, length(indicators), length(factors),
+                   dimnames = list(indicators, factors))
+  Lambda[cbind(loadings$indicator, loadings$factor)] <- loading
+
+  Phi <- matrix(factor_r, length(factors), length(factors),
+                dimnames = list(factors, factors))
+  diag(Phi) <- 1
+
+  Sigma <- Lambda %*% Phi %*% t(Lambda)
+  diag(Sigma) <- 1  # standardised indicators: residual variance makes up the rest
+  list(Sigma = Sigma, indicators = indicators, factors = factors,
+       syntax = paste(
+         map_chr(factors, \(f) {
+           ind <- loadings$indicator[loadings$factor == f]
+           glue("{f} =~ {paste(ind, collapse = ' + ')}")
+         }),
+         collapse = "\n"
+       ))
+}
+
+pop <- ordinary_population(fit_3f)
+
+set.seed(SEED)
+ordinary_null <- map(seq_len(N_REPS_NULL), function(i) {
+  sim <- as.data.frame(mvrnorm(N_REAL, mu = rep(0, nrow(pop$Sigma)), Sigma = pop$Sigma))
+  fit_i <- tryCatch(
+    cfa(pop$syntax, data = sim, estimator = "MLR", std.lv = TRUE),
+    error = function(e) NULL
+  )
+  if (is.null(fit_i) || !fit_is_proper(fit_i)) return(NULL)
+  grab_measures(fit_i, "ordinary-values null")
+}) |>
+  compact() |>
+  bind_rows()
+
+glue(
+  "Measurement-only structure from fit_3f: df = {ordinary_null$df[1]}, ",
+  "simulated at N = {N_REAL}.\n",
+  "RMSEA null: median {round(median(ordinary_null$rmsea), 4)}, ",
+  "95th pct {round(quantile(ordinary_null$rmsea, .95), 4)}, ",
+  "max {round(max(ordinary_null$rmsea), 4)}."
+)
+```
+
+This variant omits the age regressions, so its df differs from that of the
+Figure 6 model. It is included only to confirm agreement with the
+real-estimates null, which is the result to cite.
+
+## Check 2 — Is the significant chi-square just large N?
+
+The chi-square test is consistent: for fixed misspecification its expected
+value grows approximately linearly in N, so at N ≈ `r format(round(N_REAL))`
+rejection is near-certain. This check establishes whether sample size also
+accounts for CFI and RMSEA, which are constructed to be less N-dependent.
+
+The sample-size-free summary of misfit is the fit function value
+$F_{ML} \approx \chi^2/(N-1)$, of which RMSEA is a df-scaled transformation:
+
+```{r check2-fml}
+tibble(
+  model = real_fits$model,
+  n = real_fits$n,
+  df = real_fits$df,
+  chisq = real_fits$chisq,
+  F_ML = real_fits$chisq / (real_fits$n - 1),
+  rmsea_from_F = sqrt(pmax(0, (real_fits$chisq / (real_fits$n - 1)) / real_fits$df -
+                             1 / (real_fits$n - 1))),
+  rmsea_reported = real_fits$rmsea
+) |>
+  mutate(across(where(is.double), \(x) round(x, 4)))
+```
+
+```{r check2-sweep}
+#| dependson: [simulate-null, rebuild-models]
+
+n_grid <- sort(unique(c(N_SWEEP_EXTRA, N_REAL)))
+
+null_by_n <- map(n_grid, function(n) {
+  simulate_null(
+    fit_cov_age, n_reps = N_REPS_NULL, n_obs = n,
+    seed = SEED + n, label = glue("null n = {n}")
+  )
+}) |>
+  bind_rows()
+
+null_by_n |>
+  summarise(
+    chisq_median = median(chisq),
+    chisq_p_sig = mean(chisq_p < .05),
+    cfi_median = median(cfi),
+    rmsea_median = median(rmsea),
+    rmsea_q95 = quantile(rmsea, .95),
+    .by = n_obs
+  ) |>
+  arrange(n_obs) |>
+  mutate(across(where(is.double), \(x) round(x, 4)))
+```
+
+Under correct specification, chi-square tracks df rather than N, rejection
+rates remain near the nominal .05 at every N, and RMSEA remains near zero
+throughout, including at the observed N. Sample size does not produce the
+observed RMSEA of `r round(fig6$rmsea, 3)`.
+
+```{r check2-plot}
+#| fig-width: 7
+#| fig-height: 3
+
+null_by_n |>
+  ggplot(aes(factor(n_obs), rmsea)) +
+  geom_boxplot(outlier.alpha = .15, width = .5) +
+  geom_hline(yintercept = fig6$rmsea, colour = "firebrick", linetype = 2) +
+  labs(
+    x = "Simulated N", y = "RMSEA",
+    title = "RMSEA under a correctly specified model, by sample size",
+    subtitle = glue("Dashed line = observed RMSEA ({round(fig6$rmsea, 3)}) in the Figure 6 model")
+  )
+```
+
+## Check 3 — Do IRT theta measurement errors inflate the factor correlations?
+
+Each indicator is an IRT ability estimate carrying measurement error. The
+concern is that ignoring this error distorts the latent correlations. Random,
+mutually uncorrelated measurement error is absorbed by CFA residual variances,
+so latent correlations should already be disattenuated. This check tests that
+on the fitted structure.
+
+### Real marginal reliabilities
+
+Reliabilities are taken from the `load-rxx` chunk of `_06-reliability.qmd`
+(the source of Table 6) and averaged across the groups reported there.
+
+```{r check3-rxx}
+#| dependson: rebuild-models
+
+# load-rxx blanks repeated task/itemtype/invariance labels for display;
+# undo that so the table can be joined on.
+task_rxx_clean <- task_rxx |>
+  mutate(across(c(task, itemtype, invariance), \(x) na_if(as.character(x), ""))) |>
+  fill(task, itemtype, invariance, .direction = "down")
+
+rxx_by_task <- task_rxx_clean |>
+  summarise(rxx = mean(empirical_rxx, na.rm = TRUE), n_groups = n(), .by = task) |>
+  left_join(task_info |> distinct(item_task, task) |> mutate(task = as.character(task)),
+            by = "task") |>
+  filter(!is.na(item_task))
+
+rxx_by_task |> mutate(rxx = round(rxx, 3)) |> arrange(item_task)
+```
+
+### Simulating theta error on the real `fit_3f` structure
+
+True factors are generated at a specified correlation; indicators are
+generated using the standardised loadings from `fit_3f`; each indicator then
+receives independent noise scaled so that its reliability equals that task's
+marginal reliability. Measurement-error inflation would appear as recovered
+correlations systematically above the population value.
+
+```{r check3-sim}
+#| dependson: [check3-rxx, sim-helpers]
+
+structure_3f <- parameterEstimates(fit_3f, standardized = TRUE) |>
+  filter(op == "=~") |>
+  dplyr::select(factor = lhs, item_task = rhs, lambda = std.all)
+
+measurement_syntax <- structure_3f |>
+  summarise(rhs = paste(item_task, collapse = " + "), .by = factor) |>
+  glue_data("{factor} =~ {rhs}") |>
+  paste(collapse = "\n")
+
+cat(measurement_syntax, "\n")
+
+sim_spec <- structure_3f |>
+  left_join(rxx_by_task |> dplyr::select(item_task, rxx), by = "item_task")
+
+missing_rxx <- sim_spec |> filter(is.na(rxx)) |> pull(item_task)
+if (length(missing_rxx)) {
+  stop(glue(
+    "No marginal reliability found for: {paste(missing_rxx, collapse = ', ')}. ",
+    "These indicators appear in fit_3f but not in the Table 6 reliability output."
+  ), call. = FALSE)
+}
+
+simulate_measurement_error <- function(spec, r_pop, n_obs, n_reps, seed) {
+  factors <- unique(spec$factor)
+  Phi <- matrix(r_pop, length(factors), length(factors),
+                dimnames = list(factors, factors))
+  diag(Phi) <- 1
+
+  set.seed(seed)
+  reps <- map(seq_len(n_reps), function(i) {
+    F_true <- mvrnorm(n_obs, mu = rep(0, length(factors)), Sigma = Phi)
+    colnames(F_true) <- factors
+
+    obs <- map(seq_len(nrow(spec)), function(j) {
+      lambda <- spec$lambda[j]
+      rxx <- spec$rxx[j]
+      # true task score: unit variance, lambda on its factor
+      tau <- lambda * F_true[, spec$factor[j]] +
+        rnorm(n_obs, sd = sqrt(max(0, 1 - lambda^2)))
+      # theta error variance chosen so var(tau) / var(tau + e) == rxx
+      tau + rnorm(n_obs, sd = sqrt((1 - rxx) / rxx))
+    }) |>
+      set_names(spec$item_task) |>
+      as.data.frame()
+
+    fit_i <- tryCatch(
+      cfa(measurement_syntax, data = obs, estimator = "ML", std.lv = TRUE),
+      error = function(e) NULL
+    )
+    if (is.null(fit_i) || !fit_is_proper(fit_i)) return(NULL)
+
+    parameterEstimates(fit_i, standardized = TRUE) |>
+      filter(op == "~~", lhs != rhs, lhs %in% factors, rhs %in% factors) |>
+      transmute(pair = paste(lhs, rhs, sep = "-"), r_hat = std.all,
+                r_pop = r_pop, rep = i)
+  })
+
+  n_ok <- sum(!map_lgl(reps, is.null))
+  # Discarded replicates are not missing at random -- inadmissible solutions
+  # cluster where the population correlation approaches 1 -- so a high discard
+  # rate would itself bias the recovered mean. Surface it rather than hide it.
+  if (n_ok < n_reps * 0.9) {
+    warning(glue(
+      "r_pop = {r_pop}: only {n_ok} of {n_reps} replicates gave a proper ",
+      "solution. The recovered correlation for this condition is conditioned ",
+      "on admissibility and should be read with that in mind."
+    ))
+  }
+
+  reps |> compact() |> bind_rows() |>
+    mutate(n_proper = n_ok, n_attempted = n_reps)
+}
+
+r_pop_grid <- c(.30, .50, .70, .85, .98)
+
+me_results <- map(seq_along(r_pop_grid), function(k) {
+  simulate_measurement_error(
+    sim_spec, r_pop = r_pop_grid[k], n_obs = N_REAL,
+    n_reps = N_REPS_ME, seed = SEED + 1000 * k
+  )
+}) |>
+  bind_rows()
+
+me_summary <- me_results |>
+  summarise(
+    r_hat_mean = mean(r_hat), r_hat_sd = sd(r_hat),
+    bias = mean(r_hat) - first(r_pop),
+    n_proper = first(n_proper), n_attempted = first(n_attempted),
+    .by = c(r_pop, pair)
+  ) |>
+  arrange(r_pop, pair)
+
+me_summary |> mutate(across(where(is.double), \(x) round(x, 4)))
+```
+
+```{r check3-plot}
+#| fig-width: 6
+#| fig-height: 4
+
+me_summary |>
+  ggplot(aes(r_pop, r_hat_mean, colour = pair)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey50") +
+  geom_point(size = 2) +
+  geom_line() +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  labs(
+    x = "Population factor correlation", y = "Recovered factor correlation",
+    colour = NULL,
+    title = "Latent correlations under realistic IRT theta error",
+    subtitle = "Dashed line = unbiased recovery"
+  )
+```
+
+Observed correlations, for comparison:
+
+```{r check3-observed}
+parameterEstimates(fit_3f, standardized = TRUE) |>
+  filter(op == "~~", lhs != rhs, lhs %in% c("reasoning", "ef", "language"),
+         rhs %in% c("reasoning", "ef", "language")) |>
+  transmute(pair = paste(lhs, rhs, sep = "-"), r = round(std.all, 3))
+```
+
+The `n_proper` and `n_attempted` columns should be inspected before
+interpreting any row. Inadmissible solutions concentrate in the highest
+condition: a population correlation near .98 leaves the factors nearly
+collinear and a substantial share of replicates fail `post.check`, while
+conditions from .30 to .85 converge cleanly. This parallels the Heywood
+behaviour reported in `_09-bifactor.qmd` for the direct bifactor model. Because
+discarded replicates are conditioned on admissibility, the recovered mean in a
+high-discard condition is not an unbiased estimate of bias.
+
+Measurement-error inflation would place the simulated points above the
+diagonal, most visibly at low population correlations. The relevant quantities
+are the `bias` column and the distance from the dashed line.
+
+## Check 4 — Does pooling across sites manufacture the correlations?
+
+This analysis is George's, reported in the manuscript as appendix
+`#apx-subsample` (`_10-subsample-robustness.qmd`). It is reproduced here for
+completeness, so that all six checks can be read together. The code below is
+borrowed from that file verbatim by `read_qmd_chunks()` rather than
+reimplemented, so these results are his analysis rather than a reconstruction
+of it.
+
+The mechanism at issue: if sites differ in overall ability level, pooling them
+induces variance shared by every task. Each task then correlates with every
+other partly because scoring well on one indicates which site a child is from,
+which predicts scoring well on the rest. Site differences can therefore inflate
+all correlations and produce a pattern resembling a general factor. Check 5
+shows that site accounts for roughly half of each factor's variance, so this is
+a substantial concern rather than a remote one.
+
+Two designs address it. Equal-size-per-site subsampling removes the sample-size
+imbalance across sites. Within-site fits eliminate pooling entirely, and are
+the decisive test: with no aggregation, there can be no aggregation artifact.
+
+```{r check4-site-ns}
+#| dependson: rebuild-models
+
+run_qmd_chunks(here("_10-subsample-robustness.qmd"),
+               c("tbl-site-ns", "subsample-functions"))
+
+site_ns |> rename(Site = site_label, N = n)
+```
+
+Note that `subsample-functions` redefines `fit_is_proper()`. The definition is
+equivalent to the one used elsewhere in this notebook except that it does not
+suppress `lavaan`'s warning, so the chunks below emit warnings where a
+replicate reaches an inadmissible solution.
+
+```{r check4-subsample}
+#| dependson: check4-site-ns
+#| cache: true
+
+run_qmd_chunks(here("_10-subsample-robustness.qmd"), "subsample-refit")
+
+full_sample_cors <- extract_cors_3f(fit_3f) |> rename(r_full = r)
+
+subsample_results |>
+  summarise(
+    r_mean = mean(r), r_sd = sd(r),
+    r_q025 = quantile(r, .025), r_q975 = quantile(r, .975),
+    .by = pair
+  ) |>
+  left_join(full_sample_cors, by = "pair") |>
+  mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+```{r check4-subsample-n}
+#| dependson: check4-subsample
+
+glue("{n_distinct(subsample_results$rep)} of {n_reps} replicates reached an ",
+     "admissible solution, at n = {min_site_n} per site ",
+     "({min_site_n * nrow(site_ns)} total per replicate).")
+```
+
+Balancing the sites leaves the full-sample estimates essentially unchanged, so
+the imbalance across sites is not responsible for the magnitude of the
+correlations.
+
+```{r check4-within-site}
+#| dependson: check4-site-ns
+#| cache: true
+
+run_qmd_chunks(here("_10-subsample-robustness.qmd"), "within-site-fits")
+
+# within-site-fits drops sites that fail, so refit here retaining every site
+# and recording admissibility, since an inadmissible solution is itself
+# informative rather than something to omit.
+within_site_all <- site_ns |>
+  filter(n >= 100) |>
+  pull(site_label) |>
+  map(function(s) {
+    d <- filter(wide_scores, site_label == s)
+    f <- tryCatch(fit_3f_on(d), error = function(e) NULL)
+    if (is.null(f) || !isTRUE(lavInspect(f, "converged"))) {
+      return(tibble(site_label = s, n = nrow(d), note = "did not converge"))
+    }
+    extract_cors_3f(f) |>
+      mutate(site_label = s, n = nrow(d),
+             admissible = isTRUE(suppressWarnings(lavInspect(f, "post.check"))))
+  }) |>
+  bind_rows()
+
+within_site_all |>
+  mutate(r = round(r, 3)) |>
+  dplyr::select(site_label, n, pair, r, admissible) |>
+  pivot_wider(names_from = pair, values_from = r) |>
+  arrange(desc(n))
+```
+
+### Interpretation
+
+**Pooling does not create the correlations.** Within a single site, where no
+aggregation across sites is possible, Reasoning and Executive Function remain
+correlated between approximately .86 and .94 in the sites that produce
+admissible solutions. Equal-size subsampling likewise leaves the full-sample
+values close to unchanged.
+
+**Pooling does inflate them modestly.** The within-site values are lower than
+the pooled estimate (.976), by roughly .04 to .12. Aggregation therefore
+contributes to the magnitude without accounting for it; a within-site
+correlation of .86 remains a substantial discriminant validity problem.
+
+**The two Colombian sites return inadmissible solutions.** The rural site
+yields a Reasoning-EF correlation above 1, which is not a possible correlation.
+Those rows carry no information about the correlations and should be read only
+as evidence that the model is not estimable within those sites, which is
+consistent with the coverage figures in Check 5.
+
+**The two methods of adjusting for site do not agree in magnitude.** Fitting
+within sites lowers the Reasoning-EF correlation; entering site as a covariate
+(Check 6) raises it. Site-as-covariate removes site differences in factor means
+while imposing a common covariance structure across sites, whereas within-site
+fits allow all parameters to differ. That the two diverge is further evidence of
+the between-site heterogeneity identified in Check 5, and indicates that
+"adjusting for site" is not a single well-defined operation for these data. The
+within-site result makes fewer assumptions and is the one to report; the
+direction of the conclusion is the same under both.
+
+## Check 5 — Does the missingness pattern explain the misfit?
+
+The analysis sample is substantially incomplete. This check tests whether that
+accounts for the fit indices. It does not: missingness masks misfit here rather
+than producing it.
+
+### How much data each variable actually has
+
+```{r check5-coverage}
+#| dependson: rebuild-models
+
+model_vars <- colnames(lavInspect(fit_cov_age, "data"))
+
+# Read each variable's role out of the fitted model rather than hardcoding it.
+pe_fig6 <- parameterEstimates(fit_cov_age)
+indicator_of <- pe_fig6 |> filter(op == "=~") |> dplyr::select(factor = lhs, var = rhs)
+exogenous <- setdiff(pe_fig6$rhs[pe_fig6$op == "~"], c(indicator_of$var, ""))
+
+coverage <- tibble(var = model_vars) |>
+  left_join(indicator_of, by = "var") |>
+  mutate(
+    role = case_when(
+      !is.na(factor) ~ paste(factor, "indicator"),
+      var %in% exogenous ~ "exogenous predictor",
+      TRUE ~ "observed outcome"
+    ),
+    n_obs = map_int(var, \(v) sum(!is.na(wide_scores[[v]]))),
+    pct_missing = map_dbl(var, \(v) 100 * mean(is.na(wide_scores[[v]])))
+  ) |>
+  dplyr::select(var, role, n_obs, pct_missing) |>
+  arrange(pct_missing)
+
+coverage |> mutate(pct_missing = round(pct_missing, 1))
+```
+
+```{r check5-coverage-counts}
+#| dependson: check5-coverage
+
+task_vars <- setdiff(model_vars, exogenous)
+k_task <- rowSums(!is.na(wide_scores[, task_vars, drop = FALSE]))
+
+glue(
+  "Of the {length(task_vars)} task scores, the typical child contributes ",
+  "mean {round(mean(k_task), 2)} / median {median(k_task)}; ",
+  "{sum(k_task == length(task_vars))} children ",
+  "({round(100 * mean(k_task == length(task_vars)), 1)}%) have all of them."
+)
+
+table(`tasks observed` = k_task)
+```
+
+`age_c` is never missing, so including it would overstate coverage. The
+figures above cover the task scores only.
+
+### The missingness is structured by site
+
+```{r check5-by-site}
+#| dependson: check5-coverage
+
+wide_scores |>
+  summarise(
+    n = n(),
+    across(all_of(task_vars), \(x) round(100 * mean(is.na(x)))),
+    .by = site_label
+  ) |>
+  arrange(desc(n))
+
+wide_scores |>
+  mutate(k = rowSums(!is.na(pick(all_of(task_vars))))) |>
+  summarise(
+    n = n(), mean_tasks = round(mean(k), 2), median_tasks = median(k),
+    pct_complete = round(100 * mean(k == length(task_vars)), 1),
+    .by = site_label
+  ) |>
+  arrange(desc(n))
+```
+
+Coverage is not distributed evenly across the sample; it approximates a design
+variable. The two Colombian sites contribute most of the sample but few tasks
+per child, while the German and Canadian sites are substantially denser.
+
+### Refitting where the data are dense
+
+```{r check5-density-fits}
+#| dependson: check5-by-site
+#| cache: true
+
+fit_fig6_on <- function(data) {
+  tryCatch(
+    sem(model_cov_age, data = data, estimator = "MLR", missing = "fiml",
+        std.lv = FALSE, optim.method = "nlminb",
+        control = list(iter.max = 50000, rel.tol = 1e-6)),
+    error = function(e) NULL
+  )
+}
+
+summarise_subset <- function(data, label) {
+  f <- fit_fig6_on(data)
+  if (is.null(f) || !lavInspect(f, "converged")) {
+    return(tibble(model = label, n = nrow(data), note = "did not converge"))
+  }
+  grab_measures(f, label) |>
+    mutate(proper = isTRUE(suppressWarnings(lavInspect(f, "post.check"))))
+}
+
+dense_sites  <- c("mpieva-de", "western-ca")
+sparse_sites <- setdiff(unique(as.character(wide_scores$site_label)), dense_sites)
+
+density_fits <- bind_rows(
+  summarise_subset(wide_scores, "All pooled"),
+  map(sort(unique(as.character(wide_scores$site_label))),
+      \(s) summarise_subset(filter(wide_scores, site_label == s), s)) |> bind_rows(),
+  summarise_subset(filter(wide_scores, site_label %in% dense_sites), "Dense sites only"),
+  summarise_subset(filter(wide_scores, site_label %in% sparse_sites), "Sparse sites only")
+)
+
+density_fits |>
+  dplyr::select(model, n, df, chisq, cfi, rmsea, srmr, proper) |>
+  mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+**RMSEA and SRMR diverge at the sparse sites.** The Colombian subsets return
+RMSEA of approximately .02 to .04 alongside improper solutions, and SRMR of
+approximately .21 at the rural site. With roughly 3.5 observed tasks per child
+there is little covariance structure available to misfit, so power to detect
+misspecification is low and RMSEA is correspondingly small. The `proper` column
+should be checked before these rows are interpreted.
+
+**Pooling the two dense sites yields worse fit than either alone** (RMSEA .094
+against .067 and .021), and worse than the full sample. This indicates
+between-site heterogeneity in covariance structure.
+
+**Missingness does not account for the misfit.** Were it responsible, the
+sparse subsets would fit worst and the dense subsets best; the reverse holds.
+This agrees with Check 1, in which the null simulation imposes the observed
+missingness pattern on correctly specified data and returns RMSEA near zero.
+
+Missingness does affect interpretation. The sample is dominated by sites
+contributing little covariance information, and FIML assumes data are missing
+at random conditional on the modelled variables. Site is not in this model and
+coverage depends strongly on site, so that assumption carries weight here. This
+is a limitation of interpretation and generalisability rather than an artifact
+accounting for the misfit.
+
+## Check 6 — Are the factors empirically distinguishable?
+
+Checks 1 to 5 test whether the reported values are artifacts. This check tests
+what the values imply. Two questions: whether the factor correlations are
+distinguishable from unity, and whether they survive adjustment for site.
+
+### Interval estimates and a test against r = 1
+
+Because `fit_3f` is fitted with `std.lv = TRUE`, factor variances are fixed at
+1 and each factor covariance is itself the correlation, so `lavaan`'s
+confidence intervals apply directly to the correlations.
+
+```{r check6-ci}
+#| dependson: rebuild-models
+
+parameterEstimates(fit_3f, standardized = TRUE, ci = TRUE, level = .95) |>
+  filter(op == "~~", lhs != rhs,
+         lhs %in% c("reasoning", "ef", "language"),
+         rhs %in% c("reasoning", "ef", "language")) |>
+  transmute(pair = paste(lhs, rhs, sep = "-"),
+            r = std.all, se = se,
+            ci_lower = ci.lower, ci_upper = ci.upper) |>
+  mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+A correlation statistically indistinguishable from 1 means the two factors are
+not separable: a model merging them fits as well as one keeping them apart.
+The syntax below is regenerated from the `fit_3f` parameter table so the
+constrained and free models are guaranteed nested and identical apart from the
+single fixed correlation.
+
+```{r check6-unity}
+#| dependson: rebuild-models
+#| cache: true
+
+build_3f_syntax <- function(fit, fixed_pair = NULL, fixed_value = 1) {
+  pe <- parameterEstimates(fit)
+  loads <- pe |> filter(op == "=~") |> dplyr::select(factor = lhs, ind = rhs)
+  factors <- unique(loads$factor)
+  preds <- setdiff(unique(pe$rhs[pe$op == "~"]), "")
+
+  measurement <- map_chr(factors, \(f)
+    glue("{f} =~ {paste(loads$ind[loads$factor == f], collapse = ' + ')}"))
+  covariances <- combn(factors, 2, simplify = FALSE) |>
+    map_chr(\(pr) if (!is.null(fixed_pair) && setequal(pr, fixed_pair))
+      glue("{pr[1]} ~~ {fixed_value}*{pr[2]}") else glue("{pr[1]} ~~ {pr[2]}"))
+  regressions <- map_chr(factors, \(f)
+    glue("{f} ~ {paste(preds, collapse = ' + ')}"))
+
+  paste(c(measurement, covariances, regressions), collapse = "\n")
+}
+
+fit_3f_syntax <- function(syntax) {
+  sem(syntax, data = wide_scores, estimator = "MLR", missing = "fiml",
+      std.lv = TRUE, optim.method = "nlminb",
+      control = list(iter.max = 50000, rel.tol = 1e-6))
+}
+
+# Free model rebuilt from the parameter table; must reproduce fit_3f exactly.
+fit_free <- fit_3f_syntax(build_3f_syntax(fit_3f))
+stopifnot(isTRUE(all.equal(fitMeasures(fit_free)[["chisq"]],
+                           fitMeasures(fit_3f)[["chisq"]], tolerance = 1e-4)))
+
+factor_pairs <- combn(c("reasoning", "ef", "language"), 2, simplify = FALSE)
+
+unity_tests <- map(factor_pairs, function(pr) {
+  fit_con <- tryCatch(fit_3f_syntax(build_3f_syntax(fit_3f, pr)),
+                      error = function(e) NULL)
+  if (is.null(fit_con) || !lavInspect(fit_con, "converged")) {
+    return(tibble(pair = paste(pr, collapse = "-"), note = "did not converge"))
+  }
+  lrt <- suppressWarnings(as.data.frame(lavTestLRT(fit_con, fit_free)))
+  row <- lrt[!is.na(lrt[["Chisq diff"]]), ][1, ]
+  tibble(
+    pair        = paste(pr, collapse = "-"),
+    chisq_diff  = row[["Chisq diff"]],
+    df_diff     = row[["Df diff"]],
+    p_value     = row[["Pr(>Chisq)"]],
+    aic_free    = fitMeasures(fit_free)[["aic"]],
+    aic_r1      = fitMeasures(fit_con)[["aic"]],
+    bic_free    = fitMeasures(fit_free)[["bic"]],
+    bic_r1      = fitMeasures(fit_con)[["bic"]],
+    proper_r1   = isTRUE(suppressWarnings(lavInspect(fit_con, "post.check")))
+  )
+}) |> bind_rows()
+
+unity_tests |> mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+A non-significant `p_value` indicates that fixing the correlation to 1 does
+not significantly degrade fit. Lower `aic_r1` / `bic_r1` than `aic_free` /
+`bic_free` indicates that the merged model is preferred on information
+criteria.
+
+`proper_r1` is `FALSE` for every pair by construction, not as a diagnostic
+failure. Fixing one off-diagonal element of a 3 x 3 latent correlation matrix
+to 1 makes that matrix singular, so `post.check` necessarily reports a
+non-positive-definite latent covariance matrix. This is the intended
+constraint rather than an estimation problem, and is the one place in this
+notebook where a `FALSE` in a `proper` column should not be treated as grounds
+for discarding the result.
+
+### Site as a covariate
+
+An alternative to a multi-group model is to enter site as dummy predictors
+alongside age. This removes between-site differences in factor *means*, so the
+residual factor correlations are net of site composition. It does not model
+between-site differences in covariance structure, which is the heterogeneity
+identified in Check 5.
+
+```{r check6-site-covariate}
+#| dependson: rebuild-models
+#| cache: true
+
+d_site <- wide_scores |> mutate(site_label = fct_drop(site_label))
+site_dummies <- model.matrix(~ site_label, data = d_site)[, -1, drop = FALSE]
+colnames(site_dummies) <- paste0("site", seq_len(ncol(site_dummies)))
+d_site <- bind_cols(d_site, as.data.frame(site_dummies))
+
+reference_site <- levels(d_site$site_label)[1]
+site_terms <- paste(colnames(site_dummies), collapse = " + ")
+
+mdl_3f_site <- glue("
+reasoning =~ mrot + matrix + math
+ef        =~ mg + sds + hf
+language  =~ vocab + trog + tom
+reasoning ~~ ef + language
+ef ~~ language
+reasoning ~ age_c + {site_terms}
+ef        ~ age_c + {site_terms}
+language  ~ age_c + {site_terms}
+")
+
+fit_3f_site <- sem(mdl_3f_site, data = d_site, estimator = "MLR",
+                   missing = "fiml", std.lv = TRUE, optim.method = "nlminb",
+                   control = list(iter.max = 50000, rel.tol = 1e-6))
+
+glue("Reference site: {reference_site}; {ncol(site_dummies)} dummy predictors. ",
+     "Proper solution: {isTRUE(suppressWarnings(lavInspect(fit_3f_site, 'post.check')))}")
+
+extract_cors <- function(fit, label) {
+  parameterEstimates(fit, standardized = TRUE) |>
+    filter(op == "~~", lhs != rhs,
+           lhs %in% c("reasoning", "ef", "language"),
+           rhs %in% c("reasoning", "ef", "language")) |>
+    transmute(pair = paste(lhs, rhs, sep = "-"), !!label := round(std.all, 3))
+}
+
+left_join(extract_cors(fit_3f, "age_only"),
+          extract_cors(fit_3f_site, "age_plus_site"), by = "pair")
+```
+
+```{r check6-site-fit}
+#| dependson: check6-site-covariate
+
+bind_rows(grab_measures(fit_3f, "age only"),
+          grab_measures(fit_3f_site, "age + site")) |>
+  dplyr::select(model, n, df, chisq, cfi, rmsea, srmr) |>
+  mutate(across(where(is.double), \(x) round(x, 3)))
+
+round(lavInspect(fit_3f_site, "r2")[c("reasoning", "ef", "language")], 3)
+```
+
+The `r2` values give the proportion of each factor's variance attributable to
+age and site jointly, indexing how much of the between-person variance is
+associated with sampling site.
+
+### Interpretation
+
+Three results follow.
+
+**The failure of discriminant validity is specific to one factor pair.**
+Reasoning and Executive Function are not statistically distinguishable: the
+confidence interval for their correlation includes 1, constraining it to 1 does
+not significantly degrade fit, and both AIC and BIC favour the constrained
+model. The other two pairs are clearly distinguishable, with the r = 1
+constraint strongly rejected in each case and both information criteria
+favouring the free model. Language is therefore separable from both Reasoning
+and Executive Function; the three-factor structure fails only in that it does
+not separate Reasoning from Executive Function. This is a more precise
+statement of the problem than the magnitude of the correlations alone.
+
+**Adjusting for site does not reduce the collinearity.** Site accounts for a
+substantial share of factor variance, but the Reasoning-EF correlation
+increases rather than decreases once site is partialled out. The collinearity
+is therefore within-site, not a product of pooling heterogeneous samples. This
+should be read alongside the within-site fits in Check 4, which move the
+correlation in the opposite direction. The
+Reasoning-Language and EF-Language correlations decrease, indicating that site
+composition inflates them: adjusting for site improves Language's separation
+from the other two factors rather than reducing it.
+
+**Adjusting for site degrades fit.** Dummy covariates constrain factor means
+across sites but impose a common covariance structure, which Check 5 shows does
+not hold. The site-covariate specification is therefore informative about the
+correlations but is not a remedy for the misfit.
+
+A constraint on interpretation: pairwise coverage for the indicator pairs that
+identify the Reasoning-EF distinction is low (see Check 5), and each factor has
+three indicators. "Not distinguishable from r = 1" is therefore consistent with
+two readings — that the constructs are not separable in this population, or
+that these data lack the information to separate them. The present design does
+not adjudicate between them.
+
+```{r check6-coverage-crossfactor}
+#| dependson: [check6-unity, check5-coverage]
+
+cov_mat <- lavInspect(fit_3f, "coverage")
+r_inds  <- c("mrot", "matrix", "math")
+e_inds  <- c("mg", "sds", "hf")
+
+glue(
+  "Pairwise coverage for Reasoning x EF indicator pairs: ",
+  "min {round(min(cov_mat[r_inds, e_inds]), 2)}, ",
+  "median {round(median(cov_mat[r_inds, e_inds]), 2)}, ",
+  "max {round(max(cov_mat[r_inds, e_inds]), 2)}."
+)
+
+round(cov_mat[c(r_inds, e_inds), c(r_inds, e_inds)], 2)
+```
+
+## Summary
+
+```{r summary-table}
+tibble(
+  check = c(
+    "1. Low df inflates RMSEA",
+    "2. Large N inflates chi-square",
+    "3. IRT theta error inflates factor correlations",
+    "4. Site pooling manufactures the correlations",
+    "5. Missingness drives the misfit",
+    "6. Factors are empirically distinguishable"
+  ),
+  target = c("fit_cov_age", "fit_cov_age", "fit_3f", "fit_3f", "fit_cov_age",
+             "fit_3f"),
+  evidence = c(
+    glue("df = {DF_REAL}; null RMSEA median {round(median(null_fig6$rmsea), 3)}, ",
+         "95th pct {round(quantile(null_fig6$rmsea, .95), 3)} vs observed {round(fig6$rmsea, 3)}"),
+    glue("Null rejection rate near .05 at every N; null RMSEA ~0 at N = {N_REAL}"),
+    glue("Max |bias| across conditions = {round(max(abs(me_summary$bias)), 3)}"),
+    glue("Within-site fits (no pooling) still give Reasoning-EF ",
+         "{paste(round(range(within_site_all$r[within_site_all$pair == 'reasoning-ef' & within_site_all$admissible], na.rm = TRUE), 2), collapse = '-')}; ",
+         "equal-size subsampling leaves full-sample values near unchanged"),
+    glue("Runs the other way: sparse sites show better RMSEA but improper ",
+         "solutions; dense sites pooled are worse ",
+         "({round(density_fits$rmsea[density_fits$model == 'Dense sites only'], 3)}) ",
+         "than the full sample ({round(fig6$rmsea, 3)})"),
+    glue("Reasoning-EF r = 1 not rejected ",
+         "(p = {round(unity_tests$p_value[unity_tests$pair == 'reasoning-ef'], 2)}, ",
+         "AIC/BIC favour the constraint); other two pairs clearly separable ",
+         "(p < .001); adjusting for site raises Reasoning-EF, not lowers it")
+  )
+)
+```
+
+All values are recomputed at each render from the fitted models.
+
+Checks 1, 2, 3 and 5 test candidate artifacts; none accounts for the reported
+misfit or the magnitude of the correlations. Check 4, reproduced from George's
+appendix analysis, shows that pooling across sites inflates the correlations
+modestly but does not produce them. Check 6 localises the discriminant
+validity problem: Reasoning and Executive Function are not statistically
+distinguishable, this does not arise from pooling across sites, and the
+remaining two factor pairs are clearly separable.
+
+The general-factor account in `_09-bifactor.qmd` (appendix `#apx-bifactor`) is
+consistent with these results, subject to the identification constraint noted
+in Check 6: with three indicators per factor and low pairwise coverage, the
+data cannot distinguish non-separable constructs from insufficient information
+to separate them.
+
+Check 5 additionally identifies between-site heterogeneity in covariance
+structure as a contributor to the misfit, which is not addressed by the
+existing robustness analyses.
+
+## Reproducibility
+
+```{r session-info}
+#| cache: false
+
+glue("Rendered: {Sys.time()}")
+glue("Seed: {SEED}; null replicates: {N_REPS_NULL}; measurement-error replicates: {N_REPS_ME}")
+sessionInfo()
+```

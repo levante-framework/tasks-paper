@@ -64,7 +64,22 @@ library(marginaleffects)
 ```{r settings}
 #| cache: false
 
-levante_dir <- here("../..")
+# The sibling levante repos sit one level up for some co-authors and two for
+# others, so find the right level instead of hardcoding one. `../..` is tried
+# first, preserving the previous behaviour where that layout is present.
+levante_dir <- local({
+  candidates <- c(here("../.."), here(".."))
+  has_both <- dir.exists(file.path(candidates, "levante-data-meta")) &
+    dir.exists(file.path(candidates, "levante-pilots"))
+  found <- if (any(has_both)) candidates[has_both] else
+    candidates[dir.exists(file.path(candidates, "levante-data-meta"))]
+  if (!length(found)) {
+    stop("Could not find `levante-data-meta` / `levante-pilots` in:\n",
+         paste0("  - ", normalizePath(candidates, mustWork = FALSE), collapse = "\n"),
+         "\nClone them next to this repo (or next to its parent).", call. = FALSE)
+  }
+  normalizePath(found[1])
+})
 source(here(levante_dir, "levante-data-meta/plot_settings.R"))
 .scale_colour_site <- scale_colour_ptol
 .scale_fill_site <- scale_fill_ptol
