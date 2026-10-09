@@ -1382,6 +1382,421 @@ Check 5 additionally identifies between-site heterogeneity in covariance
 structure as a contributor to the misfit, which is not addressed by the
 existing robustness analyses.
 
+## Domain-specific models: EF and Language (exploratory)
+
+The sections above concern the main construct-validity SEM. This section
+prototypes changes to the two *external-validity* models in `_08-sem.qmd`
+(`fit_ef` and `fit_lang`). It is exploratory and not currently reflected in the
+manuscript.
+
+### Data note: the MEFS score labels are wrong upstream
+
+The `metric_type` labels in `scores_mefs.rds` do not match what they contain.
+Confirmed with Mika (2026-10-09) as a known upstream issue, and consistent with
+the MEFS Technical Report (Reflection Sciences, *MEFS Technical Report 2026*,
+v. 07.26.26), which documents three
+distinct scores: a **Total Score** (0-100, combining trial accuracy and
+response time via a proprietary algorithm), a **U.S. National Percentile**
+(referenced to same-age-in-months US norms), and a **National Standard Score**
+(M = 100, SD = 15).
+
+| Label in the data | Actual score | Evidence in this sample |
+|---|---|---|
+| `standard_score` | Total Score | climbs with age (+3.6 pts/year, R² = .29), max 94 |
+| `total_score` | U.S. National Percentile | flat with age (R² = .007), roughly uniform 0-85 |
+
+The National Standard Score is not present in the data at all. (The manuscript
+cites @carlson2021 as the general MEFS reference; the score definitions and
+reliability figures used here are from the 2026 edition of the technical
+report, which is the version consulted.) The models below
+use the Total Score (labelled `standard_score`), which is the appropriate choice
+for a model containing age: the percentile is already age-referenced, so its age
+variance has been removed, and being a rank transform it is also non-linearly
+related to the underlying scale.
+
+```{r domain-mefs-labels}
+#| dependson: rebuild-models
+
+run_qmd_chunks(here("_08-sem.qmd"), c("prep-sem-ef", "prep-sem-lang"))
+
+mefs_raw <- read_rds(here(pilots_dir, "02_scoring_outputs/scores/scores_mefs.rds")) |>
+  dplyr::select(user_id, age, metric_type, metric_value) |>
+  pivot_wider(names_from = metric_type, values_from = metric_value,
+              values_fn = first) |>
+  filter(!is.na(age))
+
+# Documents the label problem rather than assuming the reader takes it on trust.
+map(c("standard_score", "total_score"), function(v) {
+  fit <- lm(mefs_raw[[v]] ~ mefs_raw$age)
+  tibble(label = v,
+         slope_per_year = coef(fit)[[2]],
+         r2_age = summary(fit)$r.squared,
+         median = median(mefs_raw[[v]], na.rm = TRUE),
+         sd = sd(mefs_raw[[v]], na.rm = TRUE),
+         max = max(mefs_raw[[v]], na.rm = TRUE))
+}) |> bind_rows() |> mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+```{r domain-mefs-agebands}
+#| dependson: domain-mefs-labels
+
+mefs_raw |>
+  mutate(band = cut(age, c(5, 7, 9, 11, 14), right = FALSE,
+                    labels = c("5-6", "7-8", "9-10", "11-13"))) |>
+  summarise(n = n(),
+            mean_total_score = round(mean(standard_score, na.rm = TRUE), 1),
+            mean_percentile = round(mean(total_score, na.rm = TRUE), 1),
+            .by = band) |>
+  arrange(band)
+```
+
+The age bands make the point without any modelling: the variable labelled
+`standard_score` rises monotonically across age while the one labelled
+`total_score` does not.
+
+### How age enters the model: three specifications
+
+`fit_ef` and `fit_lang` both specify age as a predictor of the latent factor.
+That is one of three defensible choices, and they answer different questions.
+
+| Spec | Specification | Question |
+|---|---|---|
+| A | factor only, no age | baseline measurement model |
+| B | `factor ~ age` (current manuscript) | how much factor variance is developmental |
+| C | `indicator ~ age` for every indicator | does the factor cohere beyond shared age-related growth? |
+
+B leaves age-driven covariance among the indicators intact, so it does not
+test whether the factor is distinguishable from shared developmental growth.
+C removes age from each indicator and estimates the factor from what remains.
+Across an age range of 5 to 13 years this distinction is substantive.
+
+```{r domain-age-specs}
+#| dependson: domain-mefs-labels
+
+build_age_specs <- function(factor_name, indicators) {
+  measurement <- glue("{factor_name} =~ {paste(indicators, collapse = ' + ')}")
+  list(
+    `A no age`          = as.character(measurement),
+    `B age -> factor`   = paste(measurement, glue("{factor_name} ~ age"), sep = "\n"),
+    `C age -> indicators` = paste(measurement,
+                                  paste(glue("{indicators} ~ age"), collapse = "\n"),
+                                  sep = "\n")
+  )
+}
+
+fit_domain <- function(syntax, data) {
+  tryCatch(
+    sem(syntax, data = data, estimator = "MLR", missing = "fiml",
+        std.lv = TRUE, optim.method = "nlminb",
+        control = list(iter.max = 50000, rel.tol = 1e-6)),
+    error = function(e) NULL
+  )
+}
+
+summarise_domain <- function(fits) {
+  imap(fits, function(f, lab) {
+    if (is.null(f) || !isTRUE(lavInspect(f, "converged")))
+      return(tibble(spec = lab, note = "did not converge"))
+    grab_measures(f, lab) |>
+      dplyr::select(spec = model, df, chisq, cfi, rmsea, srmr) |>
+      mutate(proper = isTRUE(suppressWarnings(lavInspect(f, "post.check"))))
+  }) |> bind_rows()
+}
+
+loadings_domain <- function(fits) {
+  imap(fits, function(f, lab) {
+    if (is.null(f)) return(tibble())
+    parameterEstimates(f, standardized = TRUE) |>
+      filter(op == "=~") |>
+      transmute(indicator = rhs, spec = lab, lambda = round(std.all, 3))
+  }) |> bind_rows() |> pivot_wider(names_from = spec, values_from = lambda)
+}
+
+ef_indicators   <- c("hf", "mg", "sds", "mefs")
+lang_indicators <- c("swr", "sre", "pa", "trog", "vocab")
+
+ef_fits <- build_age_specs("EF", ef_indicators) |>
+  map(\(syn) fit_domain(syn, ef_wide_scores))
+lang_fits <- build_age_specs("Language", lang_indicators) |>
+  map(\(syn) fit_domain(syn, lang_wide_scores))
+```
+
+```{r domain-ef-results}
+#| dependson: domain-age-specs
+
+glue("EF models, n = {nrow(ef_wide_scores)} ",
+     "({sum(!is.na(ef_wide_scores$mefs))} with MEFS)")
+
+summarise_domain(ef_fits) |> mutate(across(where(is.double), \(x) round(x, 3)))
+loadings_domain(ef_fits)
+```
+
+```{r domain-lang-results}
+#| dependson: domain-age-specs
+
+glue("Language models, n = {nrow(lang_wide_scores)}")
+
+summarise_domain(lang_fits) |> mutate(across(where(is.double), \(x) round(x, 3)))
+loadings_domain(lang_fits)
+```
+
+How much age variance each indicator carries, which determines how far its
+loading moves between specifications:
+
+```{r domain-age-per-indicator}
+#| dependson: domain-age-specs
+
+age_dependence <- function(data, indicators, domain) {
+  map(indicators, function(v) {
+    r <- cor(data[[v]], data$age, use = "pairwise.complete.obs")
+    tibble(domain = domain, indicator = v, r_age = r, r2_age = r^2)
+  }) |> bind_rows()
+}
+
+bind_rows(
+  age_dependence(ef_wide_scores, ef_indicators, "EF"),
+  age_dependence(lang_wide_scores, lang_indicators, "Language")
+) |>
+  mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+Spec B is nested within spec C: B constrains age's association with each
+indicator to operate entirely through the factor, which C leaves free. The
+constraint is therefore testable.
+
+```{r domain-b-vs-c}
+#| dependson: domain-age-specs
+
+compare_b_c <- function(fits, domain) {
+  B <- fits[["B age -> factor"]]
+  C <- fits[["C age -> indicators"]]
+  if (is.null(B) || is.null(C)) return(tibble(domain = domain, note = "model missing"))
+  lrt <- suppressWarnings(as.data.frame(lavTestLRT(B, C)))
+  row <- lrt[!is.na(lrt[["Chisq diff"]]), ][1, ]
+  tibble(
+    domain = domain,
+    df_B = fitMeasures(B)[["df"]], df_C = fitMeasures(C)[["df"]],
+    chisq_diff = row[["Chisq diff"]], df_diff = row[["Df diff"]],
+    p_value = row[["Pr(>Chisq)"]],
+    aic_B = fitMeasures(B)[["aic"]], aic_C = fitMeasures(C)[["aic"]],
+    bic_B = fitMeasures(B)[["bic"]], bic_C = fitMeasures(C)[["bic"]]
+  )
+}
+
+bind_rows(compare_b_c(ef_fits, "EF"), compare_b_c(lang_fits, "Language")) |>
+  mutate(across(where(is.double), \(x) round(x, 3)))
+```
+
+```{r domain-age-r2-factor}
+#| dependson: domain-age-specs
+
+# Proportion of factor variance attributable to age under spec B.
+tibble(
+  domain = c("EF", "Language"),
+  r2_age_on_factor = c(
+    lavInspect(ef_fits[["B age -> factor"]], "r2")[["EF"]],
+    lavInspect(lang_fits[["B age -> factor"]], "r2")[["Language"]]
+  )
+) |> mutate(r2_age_on_factor = round(r2_age_on_factor, 3))
+```
+
+#### Interpretation
+
+**Spec B's constraint is rejected for EF but not for Language.** For the EF
+model, allowing age to predict each indicator directly improves fit by far more
+than the three degrees of freedom it costs, and both information criteria
+prefer spec C. For the Language model the constraint is not rejected, and BIC
+prefers the more parsimonious spec B. The manuscript's specification is
+therefore adequate for Language but not for EF, where age's association with
+the tasks does not operate solely through the factor.
+
+**The EF factor depends heavily on age-related variance.** Under spec C the
+Hearts and Flowers loading falls to a level at which it contributes little to
+the factor, while Memory is retained and Same and Different is partly retained.
+The movement tracks each indicator's age dependence: the two indicators
+carrying the most age variance (Hearts and Flowers and MEFS) lose the most
+between B and C, while Memory, which carries the least, becomes the dominant
+indicator.
+This is consistent with the observed partial correlations: controlling for age,
+Hearts and Flowers correlates .03 with Same and Different and .11 with Memory,
+whereas Memory and Same and Different correlate .39. A substantial part of what
+the EF factor currently captures is shared age-related growth rather than a
+common executive function dimension.
+
+**The Language factor does not show this pattern.** All five loadings remain
+strong under spec C, so Language coheres independently of age. This is not
+because the Language indicators carry less age variance -- Word Reading
+(r = .47) is as age-dependent as Hearts and Flowers (r = .47) -- but because
+the Language tasks retain substantial shared variance once age is removed,
+whereas Hearts and Flowers largely does not.
+
+#### What these specifications license as claims
+
+Two claims are available in principle: that the battery measures a
+*developmental* construct, and that it measures *individual differences* in
+that construct. The three specifications bear on them differently, and the two
+domains come out differently.
+
+**For Language, both claims hold.** Spec B is not rejected, so age's
+association with the five tasks is adequately described as operating through a
+common factor; that factor accounts for 31.5% of factor variance. All five
+loadings remain strong under spec C, so the same factor also captures variation
+among children of the same age. One model supports both readings.
+
+**For EF, neither holds in unqualified form.** The rejection of spec B is
+itself evidence against the developmental-construct reading: that reading
+implies age acts on the tasks *through* a common dimension, which is the
+constraint spec B imposes and the data reject. Age's associations with the four
+tasks are task-specific. Separately, a correlation with age is weak evidence of
+construct validity in any case -- most cognitive tasks show one, and the
+age trends are already reported in `_05-age_models.qmd`. Construct validity is
+a claim about covariance structure rather than about age slopes.
+
+The individual-differences reading is partly supported for EF. Under spec C,
+Memory, Same and Different, and MEFS retain substantial loadings, so a common
+dimension does exist among children of the same age, and the MEFS loading
+provides corroboration from an independent instrument rather than from internal
+structure alone. Hearts and Flowers does not participate in that dimension.
+
+The defensible statement for EF is therefore narrower than for Language:
+Memory, Same and Different and MEFS share individual-difference variance beyond
+age-related growth, supporting a common executive function dimension; Hearts
+and Flowers does not contribute to it once age is controlled; and age's
+associations with the tasks are task-specific rather than mediated by a single
+factor.
+
+Note also that the EF evidence leans on age more heavily than the Language
+evidence does -- 39.9% of factor variance against 31.5%, combined with an
+indicator that does not survive age partialling. These results are
+specification comparisons on the same data, not evidence that any one
+specification is correct.
+
+### MEFS as a latent variable
+
+In the manuscript, MEFS is an indicator of the same factor as the LEVANTE
+tasks. That specification *assumes* convergent validity rather than estimating
+it: the reported loading of .72 is MEFS's relation to a factor it helps define.
+
+An alternative separates them, so that the quantity of interest is a
+correlation between two constructs:
+
+```
+EF_levante =~ hf + mg + sds
+MEFS_lat   =~ 1*mefs          # residual variance fixed from reliability
+EF_levante ~~ MEFS_lat        # the validity coefficient
+```
+
+Because MEFS has a single indicator, its residual variance is not identified
+and must be fixed. The task scores are standardised by `prep_sem()`, so the
+residual variance is `1 - rxx` for an assumed reliability `rxx`.
+
+**On the choice of `rxx`.** The MEFS Technical Report (2026, v. 07.26.26)
+gives no internal
+consistency estimate -- plausibly because the adaptive, accuracy-and-response-time
+algorithm does not admit one -- and reports only test-retest ICCs, which vary by
+sample, age range, device and delay: .93 (ages 2.5-5, same day, table-top), .95
+(ages 2-5, table-top vs tablet), .92 (ages 3-15, two-week gap, NIH Toolbox
+levels), .73 (ages 2+, 11-90 days, N = 2,034), and .86 / .85 / .85 / .71 / .70
+by increasing delay (N = 333). None corresponds to the present sample, which is
+ages 5-13, tablet-administered, and partly in Spanish and German outside the US
+norming population.
+
+Two further considerations argue against adopting any single value. The report
+describes the .73 estimate as deflated, because those children were enrolled in
+studies and programmes that may have acted as EF interventions. And test-retest
+reliability is the wrong coefficient for this purpose: measured over an interval
+it absorbs genuine developmental change as well as measurement error, so it
+understates single-occasion reliability and over-corrects the correlation.
+
+The analysis is therefore reported as a sensitivity range, with `rxx = 1`
+(no correction) included as the reference case. That reference case is the
+quantity that requires no assumption, and it is a lower bound.
+
+```{r domain-mefs-latent}
+#| dependson: domain-age-specs
+#| cache: true
+
+mefs_latent_fit <- function(rxx, with_age) {
+  syntax <- glue(
+    "EF_levante =~ 1*hf + mg + sds\n",
+    "MEFS_lat =~ 1*mefs\n",
+    "mefs ~~ {round(1 - rxx, 4)}*mefs\n",
+    "EF_levante ~~ MEFS_lat",
+    if (with_age) "\nEF_levante ~ age\nMEFS_lat ~ age" else ""
+  )
+  f <- tryCatch(
+    sem(syntax, data = ef_wide_scores, estimator = "MLR", missing = "fiml",
+        std.lv = FALSE, optim.method = "nlminb",
+        control = list(iter.max = 50000, rel.tol = 1e-6)),
+    error = function(e) NULL
+  )
+  if (is.null(f) || !isTRUE(lavInspect(f, "converged")))
+    return(tibble(rxx = rxx, age = with_age, note = "did not converge"))
+
+  r <- parameterEstimates(f, standardized = TRUE) |>
+    filter(op == "~~", lhs == "EF_levante", rhs == "MEFS_lat") |>
+    pull(std.all)
+
+  tibble(rxx = rxx, age = with_age, r_EF_MEFS = r,
+         cfi = fitMeasures(f)[["cfi"]], rmsea = fitMeasures(f)[["rmsea"]],
+         proper = isTRUE(suppressWarnings(lavInspect(f, "post.check"))))
+}
+
+rxx_grid <- c(.70, .73, .80, .85, .90, .95, 1.00)
+
+mefs_sensitivity <- expand_grid(rxx = rxx_grid, with_age = c(FALSE, TRUE)) |>
+  pmap(\(rxx, with_age) mefs_latent_fit(rxx, with_age)) |>
+  bind_rows()
+
+# Fit is constant across rxx within each age condition (fixing a residual
+# variance consumes no df), so it is reported separately rather than repeated.
+mefs_sensitivity |>
+  mutate(age = if_else(age, "age on both factors", "no age")) |>
+  dplyr::select(rxx, age, r_EF_MEFS) |>
+  pivot_wider(names_from = age, values_from = r_EF_MEFS) |>
+  mutate(across(where(is.double), \(x) round(x, 3)))
+
+mefs_sensitivity |>
+  summarise(cfi = first(cfi), rmsea = first(rmsea),
+            all_proper = all(proper), .by = age) |>
+  mutate(age = if_else(age, "age on both factors", "no age"),
+         across(where(is.double), \(x) round(x, 3)))
+```
+
+```{r domain-mefs-reference}
+#| dependson: domain-mefs-latent
+
+ref <- mefs_sensitivity |> filter(rxx == 1, !age)
+rng <- mefs_sensitivity |> filter(!age) |> pull(r_EF_MEFS) |> range()
+
+glue(
+  "Reference case (no correction for MEFS unreliability): ",
+  "r(EF_levante, MEFS) = {round(ref$r_EF_MEFS, 3)}. ",
+  "Across assumed reliabilities of {min(rxx_grid)} to 1.00 the estimate ranges ",
+  "from {round(rng[1], 3)} to {round(rng[2], 3)}."
+)
+```
+
+#### Interpretation
+
+Separating MEFS from the LEVANTE tasks yields a validity coefficient of about
+.74 without any correction for MEFS's measurement error, which is slightly above
+the .72 loading reported in the manuscript and requires no assumption about
+reliability. Correcting for unreliability moves the estimate upward throughout,
+reaching approximately .88 at the lowest reliability considered. The direction
+is therefore unambiguous even though the magnitude is not: the uncorrected
+estimate is a lower bound on the association between the LEVANTE executive
+function construct and MEFS.
+
+Fit is unaffected by `rxx`, since fixing a residual variance consumes no degrees
+of freedom and the model-implied covariance structure among the observed
+variables is unchanged.
+
+Note that the models including age fit considerably worse than those without,
+and give lower correlations throughout. This is the same pattern as spec B
+versus spec C above: constraining age to act through the factors does not
+describe these data well.
+
 ## Reproducibility
 
 ```{r session-info}
