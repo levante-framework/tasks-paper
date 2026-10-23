@@ -19,7 +19,13 @@ task_rxx <- mod_stats |>
     invariance = invariance |> str_to_sentence()
   ) |>
   left_join(task_info) |>
-  select(task, itemtype, invariance, group_label, empirical_rxx) |>
+  # scored runs per task and group, keyed on site for the multigroup models and
+  # on language for the configural (by_language) ones
+  left_join(bind_rows(
+    task_scores |> count(item_task, group_label = as.character(site_label)),
+    task_scores |> count(item_task, group_label = as.character(language))
+  ), by = c("item_task", "group_label")) |>
+  select(task, itemtype, invariance, group_label, n, empirical_rxx) |>
   arrange(task) |>
   mutate(across(c(task, itemtype, invariance),
                 \(s) if_else(task == lag(task) & !is.na(lag(task)), "", s)))

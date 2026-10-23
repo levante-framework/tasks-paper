@@ -41,9 +41,19 @@ true, e.g.
 WHAT THIS IS FOR
 Both reviewers flagged the Construct Validity SEM: overall fit below
 conventional thresholds, and very high correlations among Reasoning,
-Executive Function, and Language. Before leaning on the general-factor /
-bifactor reading written up in _09-bifactor.qmd, this notebook checks whether
-the misfit and the high correlations could instead be statistical artifacts.
+Executive Function, and Language. This notebook checks whether the misfit and
+the high correlations could instead be statistical artifacts.
+
+HOW THE MANUSCRIPT NOW STANDS (updated after these checks were run)
+The manuscript reports the inter-factor correlations descriptively and
+deliberately does NOT adjudicate the factor structure: the bifactor /
+Schmid-Leiman appendix was removed and the factor-count comparison table
+dropped, because those results are reserved for a dedicated paper in
+preparation. _09-bifactor.qmd is still in the repo and still runs; ms.qmd
+carries a commented block showing how to restore the appendix. The checks
+below therefore support the manuscript's statement that the high correlations
+are a real feature of the data rather than an artifact -- which is what
+licenses deferring their interpretation rather than explaining them away.
 
 It re-runs the real models from _08-sem.qmd -- it does not rebuild a
 stand-in version of them. The chunks that construct `wide_scores`,
@@ -53,6 +63,36 @@ loadings, and factor correlations are the manuscript's own numbers and stay
 in sync if those files change.
 =============================================================================
 -->
+
+::: {.callout-note}
+## What this notebook is, and how the manuscript now stands
+
+Both reviewers flagged the construct-validity SEM: overall fit below
+conventional thresholds, and very high correlations among Reasoning, Executive
+Function and Language. Checks 1--6 below test whether those two problems could
+be statistical artifacts — of model size, sample size, IRT measurement error,
+pooling across sites, or the missingness pattern. They are not: the misfit and
+the high correlations are real features of these data.
+
+That conclusion is what shapes the manuscript's current treatment:
+
+- **Factor structure is reported but not interpreted.** The manuscript gives
+  the inter-factor correlations descriptively and defers the question of what
+  they mean, because those results are reserved for a dedicated paper in
+  preparation. The bifactor / Schmid-Leiman appendix and the factor-count
+  comparison table were removed for that reason. `_09-bifactor.qmd` is still in
+  the repo and still runs, and `ms.qmd` carries a commented block showing how
+  to restore the appendix.
+- **The external-validity models changed as a result of the last section of
+  this notebook.** Figures 7 and 8 now show the measurement model without age
+  (spec A), and Table 8 reports loadings with and without an age control
+  (spec A versus spec C). The earlier `factor ~ age` specification (spec B) was
+  dropped.
+
+Everything here re-runs the manuscript's own chunks rather than a stand-in
+copy, so the numbers are the paper's own and stay in sync when `_08-sem.qmd`
+changes.
+:::
 
 ```{r setup}
 #| cache: false
@@ -272,14 +312,19 @@ glue("wide_scores: {nrow(wide_scores)} rows x {ncol(wide_scores)} cols")
 The two reported problems attach to different fitted objects:
 
 - **Overall misfit (CFI, RMSEA): `fit_cov_age`.** The model shown in Figure 6
-  (`fig-semplot-core-tasks`): three first-order factors, Math and Stories as
-  observed endogenous outcomes rather than indicators, and age predicting each
-  factor and outcome. The CFI and RMSEA quoted in the manuscript come from this
-  fit.
-- **Factor correlations: `fit_3f`.** The three-factor comparison model in
-  `@tbl-alt-models`, which treats Math and Stories as indicators of Reasoning
-  and Language. `_09-bifactor.qmd` and `_10-subsample-robustness.qmd` build on
-  this specification.
+  (`fig-semplot-core-tasks`): three first-order factors, Stories as an observed
+  endogenous outcome, Math as a single-indicator latent whose residual is fixed
+  at 1 - rxx, and age predicting each factor and outcome. Identified with
+  `std.lv = TRUE`. The CFI and RMSEA quoted in the manuscript come from this
+  fit. (When these checks were first run, Math was also an observed outcome and
+  the model used marker-variable identification. Both changes are
+  reparameterisations or affect one fixed residual only; df, CFI and RMSEA are
+  unchanged, so the checks below still apply.)
+- **Factor correlations: `fit_3f`.** A three-factor model that treats Math and
+  Stories as indicators of Reasoning and Language. It is no longer reported in
+  the manuscript -- the factor-count table that once showed it was removed --
+  but it is still built in `_08-sem.qmd` because `_10-subsample-robustness.qmd`
+  refits it, and `_09-bifactor.qmd` needs it if that appendix is restored.
 
 Checks 1, 2 and 5 target `fit_cov_age`; Checks 3, 4 and 6 target `fit_3f`.
 
@@ -844,6 +889,12 @@ are the `bias` column and the distance from the dashed line.
 
 ## Check 4 — Does pooling across sites manufacture the correlations?
 
+<!-- The chunks in this section borrow from _10-subsample-robustness.qmd and are
+cached, because they refit the model on 200 subsamples. knitr keys the cache on
+each chunk's own code, so edits to _10-subsample-robustness.qmd will NOT
+invalidate them: clear sem/fit_diagnostics_cache/ by hand if that file
+changes. -->
+
 This analysis is George's, reported in the manuscript as appendix
 `#apx-subsample` (`_10-subsample-robustness.qmd`). It is reproduced here for
 completeness, so that all six checks can be read together. The code below is
@@ -1389,9 +1440,16 @@ existing robustness analyses.
 ## Domain-specific models: EF and Language (exploratory)
 
 The sections above concern the main construct-validity SEM. This section
-prototypes changes to the two *external-validity* models in `_08-sem.qmd`
-(`fit_ef` and `fit_lang`). It is exploratory and not currently reflected in the
-manuscript.
+concerns the two *external-validity* models in `_08-sem.qmd` (`fit_ef` and
+`fit_lang`).
+
+**These results have since been adopted in the manuscript.** Figures 7 and 8
+now show spec A (the measurement model, no age), and Table 8 reports the spec A
+and spec C loadings side by side as an age control. Spec B, which the
+manuscript previously used, has been dropped: the age slope it contributed is
+developmental-sensitivity evidence already covered by the age-models section,
+and it answers a developmental rather than a validity question. The comparison
+below is what motivated that change.
 
 ### Data note: the MEFS score labels are wrong upstream
 
@@ -1419,6 +1477,10 @@ variance has been removed, and being a rank transform it is also non-linearly
 related to the underlying scale.
 
 ```{r domain-mefs-labels}
+#| cache: false
+# Not cached: this chunk re-runs chunks borrowed from _08-sem.qmd, whose
+# contents can change without this chunk's own code changing -- which would
+# otherwise leave a stale cache silently reporting a superseded specification.
 #| dependson: rebuild-models
 
 run_qmd_chunks(here("_08-sem.qmd"), c("prep-sem-ef", "prep-sem-lang"))
@@ -1458,16 +1520,65 @@ The age bands make the point without any modelling: the variable labelled
 `standard_score` rises monotonically across age while the one labelled
 `total_score` does not.
 
+### The manuscript's EF and Language models
+
+For reference, the two domain-specific models as specified in `_08-sem.qmd`,
+reproduced here by borrowing the manuscript's own fitting and plotting chunks so
+the diagrams match the paper exactly.
+
+```{r domain-manuscript-fits}
+#| cache: false
+# Not cached: this chunk re-runs chunks borrowed from _08-sem.qmd, whose
+# contents can change without this chunk's own code changing -- which would
+# otherwise leave a stale cache silently reporting a superseded specification.
+#| results: "hide"
+
+# The manuscript's plotting chunks call get_nodes() and read_excel() unqualified,
+# relying on ms.qmd's setup; load them here so the borrowed chunks run as written.
+library(tidySEM)
+library(readxl)
+
+run_qmd_chunks(here("_08-sem.qmd"), c("sem-ef", "sem-lang"))
+```
+
+```{r fig-ef-diagram}
+#| cache: false
+# Not cached: this chunk re-runs chunks borrowed from _08-sem.qmd, whose
+# contents can change without this chunk's own code changing -- which would
+# otherwise leave a stale cache silently reporting a superseded specification.
+#| fig-cap: "Executive Function model as specified in the manuscript (`fit_ef`)."
+#| fig-width: 7
+#| fig-height: 5
+
+# sem-ef-plot only builds and styles the graph object; ms.qmd draws it in a
+# separate chunk, so plot() is called explicitly here.
+run_qmd_chunks(here("_08-sem.qmd"), "sem-ef-plot")
+plot(g_ef)
+```
+
+```{r fig-lang-diagram}
+#| cache: false
+# Not cached: this chunk re-runs chunks borrowed from _08-sem.qmd, whose
+# contents can change without this chunk's own code changing -- which would
+# otherwise leave a stale cache silently reporting a superseded specification.
+#| fig-cap: "Language model as specified in the manuscript (`fit_lang`)."
+#| fig-width: 7
+#| fig-height: 5
+
+run_qmd_chunks(here("_08-sem.qmd"), "sem-lang-plot")
+plot(g_lang)
+```
+
 ### How age enters the model: three specifications
 
-`fit_ef` and `fit_lang` both specify age as a predictor of the latent factor.
-That is one of three defensible choices, and they answer different questions.
+Age can enter these models in three defensible ways, and they answer different
+questions.
 
-| Spec | Specification | Question |
-|---|---|---|
-| A | factor only, no age | baseline measurement model |
-| B | `factor ~ age` (current manuscript) | how much factor variance is developmental |
-| C | `indicator ~ age` for every indicator | does the factor cohere beyond shared age-related growth? |
+| Spec | Specification | Question | Status in the manuscript |
+|---|---|---|---|
+| A | factor only, no age | baseline measurement model | Figures 7-8 |
+| B | `factor ~ age` | how much factor variance is developmental | dropped (was used previously) |
+| C | `indicator ~ age` for every indicator | does the factor cohere beyond shared age-related growth? | Table 8, age-controlled column |
 
 B leaves age-driven covariance among the indicators intact, so it does not
 test whether the factor is distinguishable from shared developmental growth.
@@ -1527,44 +1638,23 @@ lang_fits <- build_age_specs("Language", lang_indicators) |>
 
 ### Diagrams for the three specifications
 
-Each diagram shows the same tasks laid out the same way: age on the left, the
-factor in the middle, the tasks on the right. Only the arrows change.
+The three diagrams below show the same four (or five) tasks arranged the same
+way each time: age on the left, the factor in the middle, the tasks on the
+right. Only the arrows change.
 
-**Green arrows** run from the factor to each task. The number on each is a
-*loading*: how strongly that task reflects the factor, where 1 would be a
-perfect reflection and 0 none at all. **Blue arrows** are age effects. The small
-number beside each box is the share of that task's variation the model leaves
-unexplained.
+- **Spec A** has no age at all. It asks: do these tasks hang together?
+- **Spec B** has one arrow from age into the factor. It asks: how much of the
+  factor is developmental?
+- **Spec C** has an arrow from age into every task separately. It asks: do the
+  tasks still hang together once each one's own age-related growth has been
+  taken out?
 
-| Spec | What it does | The question it asks |
-|---|---|---|
-| A | no age in the model at all | Do these tasks hang together? |
-| B | one arrow, age into the factor | How much of the factor is just growing up? |
-| C | an arrow from age into *every task* | Do the tasks still hang together once each one's own age-related growth is removed? |
-
-Spec B is the specification used in the manuscript, so the middle panel of each
-figure below reproduces the published model. The reason it is not enough on its own
-is that putting age at the factor level leaves the age-driven overlap *between*
-the tasks untouched: any two tasks that both improve with age will still appear
-related, and the factor can absorb that shared growth rather than anything
-specific to the construct. Spec C removes each task's own age trend first and
-builds the factor from what is left, so the loadings that remain reflect
-something the tasks share beyond getting older.
-
-**What to look for:** compare the green numbers in B against those in C.
-
-- For **Language**, every loading falls by roughly the same modest amount and all
-  stay high. The factor survives having age taken out.
-- For **Executive Function**, the fall is uneven. Hearts and Flowers drops from
-  0.62 to 0.28 and MEFS from 0.72 to 0.52, while Memory barely moves. So part of
-  what held EF together was shared age-related growth rather than a common
-  executive-function ability, and it was concentrated in two of the four tasks.
+The numbers on the arrows from the factor to each task are loadings: how
+strongly that task reflects the factor, on a scale where 1 would be perfect.
+Watch what happens to those numbers between B and C.
 
 ```{r domain-spec-diagrams}
 #| results: "hide"
-
-# get_nodes() is tidySEM's and is called unqualified below.
-library(tidySEM)
 
 # The manuscript's plotting chunks are written for one model each, with node
 # positions read from Excel. These specifications have different node sets
@@ -1607,13 +1697,11 @@ plot_domain_spec <- function(fit, factor_name, indicators) {
   # indicator's arrows and its loading label becomes unreadable.
   nr <- length(indicators) + 1
   mid <- ceiling(nr / 2)
-  # Blank spacer columns between age, the factor and the indicators: without
-  # them the shapes abut and the arrow labels are clipped or dropped.
-  ncol_lay <- if (has_age) 5 else 3
-  lay <- matrix("", nrow = nr, ncol = ncol_lay)
-  lay[setdiff(seq_len(nr), mid), ncol_lay] <- indicators
-  lay[mid, ncol_lay - 2] <- factor_name
+  lay <- matrix("", nrow = nr, ncol = 3)
+  lay[setdiff(seq_len(nr), mid), 3] <- indicators
+  lay[mid, 2] <- factor_name
   if (has_age) lay[mid, 1] <- "age"
+  lay <- lay[, colSums(lay != "") > 0, drop = FALSE]
 
   g <- tidySEM::prepare_graph(
     edges = edges, nodes = nodes, layout = lay,
@@ -1754,9 +1842,12 @@ tibble(
 model, allowing age to predict each indicator directly improves fit by far more
 than the three degrees of freedom it costs, and both information criteria
 prefer spec C. For the Language model the constraint is not rejected, and BIC
-prefers the more parsimonious spec B. The manuscript's specification is
-therefore adequate for Language but not for EF, where age's association with
-the tasks does not operate solely through the factor.
+prefers the more parsimonious spec B. Spec B was therefore adequate for
+Language but not for EF, where age's association with the tasks does not
+operate solely through the factor. This asymmetry is one reason the manuscript
+now reports spec A alongside spec C for both domains rather than relying on
+spec B for either: a specification that is defensible in one domain and
+rejected in the other is a poor basis for a side-by-side validity claim.
 
 **The EF factor depends heavily on age-related variance.** Under spec C the
 Hearts and Flowers loading falls to a level at which it contributes little to
@@ -1821,11 +1912,12 @@ specification is correct.
 
 ### MEFS as a latent variable
 
-In the manuscript MEFS is one of the four indicators defining the EF factor, so
-its reported loading of .72 is its relation to a factor it helped define. That
-assumes MEFS and the LEVANTE tasks measure the same thing rather than testing it.
+In the manuscript, MEFS is an indicator of the same factor as the LEVANTE
+tasks. That specification *assumes* convergent validity rather than estimating
+it: the reported loading of .72 is MEFS's relation to a factor it helps define.
 
-A cleaner question is whether two *separate* constructs agree:
+An alternative separates them, so that the quantity of interest is a
+correlation between two constructs:
 
 ```
 EF_levante =~ hf + mg + sds
@@ -1833,126 +1925,31 @@ MEFS_lat   =~ 1*mefs          # residual variance fixed from reliability
 EF_levante ~~ MEFS_lat        # the validity coefficient
 ```
 
-A factor built from a single indicator is not identified, so its residual
-variance has to be supplied rather than estimated. Scores are standardised by
-`prep_sem()`, so that residual is `1 - rxx` for an assumed reliability `rxx`.
+Because MEFS has a single indicator, its residual variance is not identified
+and must be fixed. The task scores are standardised by `prep_sem()`, so the
+residual variance is `1 - rxx` for an assumed reliability `rxx`.
 
-**Choosing `rxx` is the difficulty.** The MEFS Technical Report (2026,
-v. 07.26.26) gives no internal consistency estimate -- plausibly because the
-adaptive, accuracy-and-response-time algorithm does not admit one -- and reports
-only test-retest ICCs, which range from .70 to .95 across samples differing in
-age, device and retest delay. None matches the present sample: ages 5--13,
-tablet-administered, partly in Spanish and German outside the US norming
-population. The report also describes its .73 estimate as deflated, those
-children having been enrolled in programmes that may have acted as EF
-interventions.
+**On the choice of `rxx`.** The MEFS Technical Report (2026, v. 07.26.26)
+gives no internal
+consistency estimate -- plausibly because the adaptive, accuracy-and-response-time
+algorithm does not admit one -- and reports only test-retest ICCs, which vary by
+sample, age range, device and delay: .93 (ages 2.5-5, same day, table-top), .95
+(ages 2-5, table-top vs tablet), .92 (ages 3-15, two-week gap, NIH Toolbox
+levels), .73 (ages 2+, 11-90 days, N = 2,034), and .86 / .85 / .85 / .71 / .70
+by increasing delay (N = 333). None corresponds to the present sample, which is
+ages 5-13, tablet-administered, and partly in Spanish and German outside the US
+norming population.
 
-Test-retest is in any case the wrong coefficient here. Measured across an
-interval it absorbs genuine developmental change along with measurement error,
-so it understates single-occasion reliability and over-corrects the correlation.
+Two further considerations argue against adopting any single value. The report
+describes the .73 estimate as deflated, because those children were enrolled in
+studies and programmes that may have acted as EF interventions. And test-retest
+reliability is the wrong coefficient for this purpose: measured over an interval
+it absorbs genuine developmental change as well as measurement error, so it
+understates single-occasion reliability and over-corrects the correlation.
 
-The analysis is therefore run across a range of assumed reliabilities rather
-than committing to one. The `rxx = 1` case assumes no measurement error at all:
-it requires no assumption and, since correcting for unreliability can only raise
-a correlation, it is a lower bound.
-
-@fig-mefs-latent shows the specification. The manuscript's version is a single
-oval with four indicators, MEFS among them; this one has two ovals joined by a
-double-headed arrow, and that arrow is the quantity of interest.
-
-Note what the `rxx = 1` panel shows: a loading of 1.00 and a residual of 0.00.
-At that setting the MEFS latent is a deterministic copy of the observed score,
-so the oval does no work -- correlating the LEVANTE factor with the observed
-score directly would give the same .74. The structure exists to permit the other
-rows: at `rxx = .85` the residual is fixed at .15, the oval then represents MEFS
-with its measurement error removed, and the correlation rises accordingly.
-
-```{r fig-mefs-latent}
-#| fig-cap: "MEFS separated from the LEVANTE executive function tasks. The orange double-headed arrow is the validity coefficient. Top: rxx = 1, assuming no measurement error in MEFS, where the latent is a copy of the observed score and the estimate is a lower bound. Middle: rxx = .85, where the fixed residual of .15 lets the latent represent MEFS net of measurement error. Bottom: rxx = 1 with age predicting both constructs, the stricter test of whether the two agree beyond shared developmental growth."
-#| fig-width: 7
-#| fig-height: 4.5
-#| dependson: domain-spec-diagrams
-
-mefs_pretty <- c(EF_levante = "LEVANTE\nExecutive\nFunction", MEFS_lat = "MEFS",
-                 hf = "Hearts and\nFlowers", mg = "Memory",
-                 sds = "Same and\nDifferent", mefs = "MEFS\nscore",
-                 age = "Age\n(years)")
-
-plot_mefs_model <- function(rxx, with_age) {
-  fit <- sem(
-    glue("EF_levante =~ 1*hf + mg + sds\n",
-         "MEFS_lat =~ 1*mefs\n",
-         "mefs ~~ {round(1 - rxx, 4)}*mefs\n",
-         "EF_levante ~~ MEFS_lat",
-         if (with_age) "\nEF_levante ~ age\nMEFS_lat ~ age" else ""),
-    data = ef_wide_scores, estimator = "MLR", missing = "fiml",
-    std.lv = FALSE, optim.method = "nlminb",
-    control = list(iter.max = 50000, rel.tol = 1e-6))
-
-  nodes <- get_nodes(fit, columns = c("name", "shape")) |>
-    mutate(label = coalesce(unname(mefs_pretty[name]), name))
-
-  edges <- parameterEstimates(fit, standardized = TRUE) |>
-    filter(op %in% c("~", "=~", "~~")) |>
-    transmute(
-      lhs, rhs, op,
-      from = if_else(op == "~", rhs, lhs),
-      to   = if_else(op == "~", lhs, rhs),
-      std.all, pvalue,
-      arrow     = if_else(op == "~~", "both", "last"),
-      curvature = if_else(op == "~~" & lhs != rhs, 60, NA_real_),
-      linetype  = 1,
-      label = if_else(op %in% c("~", "=~"),
-                      sprintf("%.2f%s", std.all,
-                              case_when(pvalue < .001 ~ "***", pvalue < .01 ~ "**",
-                                        pvalue < .05 ~ "*", TRUE ~ "")),
-                      sprintf("%.2f", std.all)))
-
-  lay <- if (with_age) rbind(
-    c("",    "", "",           "", "hf"),
-    c("",    "", "EF_levante", "", "mg"),
-    c("age", "", "",           "", "sds"),
-    c("",    "", "MEFS_lat",   "", "mefs")
-  ) else rbind(
-    c("",           "", "hf"),
-    c("EF_levante", "", "mg"),
-    c("",           "", "sds"),
-    c("MEFS_lat",   "", "mefs")
-  )
-
-  g <- tidySEM::prepare_graph(
-    edges = edges, nodes = nodes, layout = lay,
-    text_size = 3.2, rect_width = 7, rect_height = 3.5,
-    ellipses_width = 7, ellipses_height = 3.5,
-    variance_height = 2.5, variance_width = 2,
-    arrow_angle = 15, arrow_length = .2,
-    var_arrow_angle = 15, var_arrow_length = .1,
-    spacing_y = 5, spacing_x = 7, fix_coord = FALSE)
-
-  g$nodes$fill <- case_when(g$nodes$shape == "oval" ~ "#E8F2FF",
-                            g$nodes$name == "age" ~ "#FFF2E0",
-                            TRUE ~ "#F5F5F5")
-  g$nodes$colour <- "#1F1F1F"; g$nodes$font <- "#1F1F1F"
-  g$edges$colour <- case_when(
-    g$edges$op == "=~" ~ "#1B9E77",
-    g$edges$op == "~"  ~ "#386CB0",
-    g$edges$op == "~~" & g$edges$lhs != g$edges$rhs ~ "#D95F02",
-    TRUE ~ "#6B6B6B")
-  g$edges$size <- 0.6
-  g$nodes$geom_text <- TRUE
-  g$edges$label_fill <- "white"
-  g$edges$label_colour <- "#1F1F1F"
-  g$edges$label_alpha <- 1
-  g
-}
-
-for (cfg in list(list(1.00, FALSE, "rxx = 1 (no correction)"),
-                 list(0.85, FALSE, "rxx = .85"),
-                 list(1.00, TRUE,  "rxx = 1, age on both factors"))) {
-  print(plot_mefs_model(cfg[[1]], cfg[[2]]) |> plot() +
-          ggplot2::labs(title = cfg[[3]]))
-}
-```
+The analysis is therefore reported as a sensitivity range, with `rxx = 1`
+(no correction) included as the reference case. That reference case is the
+quantity that requires no assumption, and it is a lower bound.
 
 ```{r domain-mefs-latent}
 #| dependson: domain-age-specs
@@ -2021,21 +2018,23 @@ glue(
 
 #### Interpretation
 
-Treated as separate constructs, the LEVANTE EF tasks and MEFS correlate about
-.74 with no correction for measurement error, and more as the assumed
-reliability falls, reaching about .88 at the lowest value considered. The
-magnitude depends on an assumption that cannot be settled; the direction does
-not. The uncorrected .74 is a lower bound, and it already slightly exceeds the
-.72 loading reported in the manuscript.
+Separating MEFS from the LEVANTE tasks yields a validity coefficient of about
+.74 without any correction for MEFS's measurement error, which is slightly above
+the .72 loading reported in the manuscript and requires no assumption about
+reliability. Correcting for unreliability moves the estimate upward throughout,
+reaching approximately .88 at the lowest reliability considered. The direction
+is therefore unambiguous even though the magnitude is not: the uncorrected
+estimate is a lower bound on the association between the LEVANTE executive
+function construct and MEFS.
 
-Fit does not vary with `rxx`: fixing a residual variance consumes no degrees of
-freedom and leaves the implied covariances among the observed variables
-unchanged.
+Fit is unaffected by `rxx`, since fixing a residual variance consumes no degrees
+of freedom and the model-implied covariance structure among the observed
+variables is unchanged.
 
-The models including age fit considerably worse and give lower correlations
-throughout -- the same pattern as spec B versus spec C above, and for the same
-reason: constraining age to act only through the factors does not describe these
-data well.
+Note that the models including age fit considerably worse than those without,
+and give lower correlations throughout. This is the same pattern as spec B
+versus spec C above: constraining age to act through the factors does not
+describe these data well.
 
 ## Reproducibility
 
