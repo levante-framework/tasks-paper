@@ -1,3 +1,10 @@
 \usepackage{setspace}
 % \AtBeginEnvironment{longtable}{\singlespacing\footnotesize}
 \AtBeginEnvironment{longtable}{\singlespacing\renewcommand*{\arraystretch}{1.15}}
+
+% Let leftover vertical space collect at the foot of the page instead of being
+% distributed between elements. Without this, LaTeX justifies the page bottom by
+% stretching the glue around headings, so identical heading levels render with
+% visibly different spacing (e.g. "Future directions" sat 38pt above its first
+% paragraph while "Current status of the core tasks" sat at 21pt).
+\raggedbottom

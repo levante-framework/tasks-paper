@@ -118,8 +118,8 @@ nodes$label <- recode(
   sds       = "Same and\nDifferent",
   trog      = "Sentence\nUnderstanding",
   tom       = "Stories",
-  math      = "Math\nscore",
-  mathF     = "Math",
+  math      = "Math",
+  mathF     = "Math\n(latent)",
   ef        = "Executive\nFunction",
   age_c     = "Age (years)",
   .default  = str_to_title(nodes$name)
