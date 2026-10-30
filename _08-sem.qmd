@@ -306,14 +306,16 @@ ef_wide_scores <- prep_sem(bind_rows(coretask_scores, mefs_scores), ef_tasks)
 #| echo: false
 #| results: "hide" 
 
-# Spec A: the measurement model on its own. Age is deliberately excluded here.
-# Figures 7-8 answer a validity question -- do the LEVANTE tasks and the external
-# criterion mark out one construct? -- so the model should not also carry a
-# developmental regression; age effects are reported in the age-models section.
-# Spec C below adds the age control that tests whether this convergence is
-# merely shared age-related growth.
+# The external criterion is kept separate from the LEVANTE factor rather than
+# loading on it. Treating MEFS as an indicator makes the reported loading its
+# relation to a factor it helps define; correlating the two instead estimates
+# the validity coefficient without that circularity. The two specifications are
+# reparameterisations of one another (identical df and fit), so nothing is lost.
+# Age is excluded here: these models answer a validity question, and the
+# age-controlled versions are fitted separately below.
 cfa_ef <-  '
-EF =~ hf + mg + sds + mefs
+EF =~ hf + mg + sds
+EF ~~ mefs
 '
 
 fit_ef <- cfa(cfa_ef, data = ef_wide_scores,
@@ -327,11 +329,16 @@ fit_ef <- cfa(cfa_ef, data = ef_wide_scores,
 pe_ef <- parameterEstimates(fit_ef, standardized = TRUE)
 
 fmt <- function(x, d = 2) formatC(x, digits = d, format = "f")
-# standardised loadings (λ) for EF =~ hf + mg + sds + mefs
+# standardised loadings (λ) for EF =~ hf + mg + sds
 load_tab <- pe_ef |>
-  filter(op == "=~", lhs == "EF", rhs %in% c("hf","mg","sds","mefs")) |>
+  filter(op == "=~", lhs == "EF", rhs %in% c("hf","mg","sds")) |>
   select(rhs, std.all) |>
-  deframe()  # named vector: c(hf = ., mg = ., sds = ., mefs = .)
+  deframe()  # named vector: c(hf = ., mg = ., sds = .)
+
+# the validity coefficient: EF factor with the external criterion
+r_ef_mefs <- pe_ef |>
+  filter(op == "~~", lhs == "EF", rhs == "mefs") |>
+  pull(std.all) |> as.numeric()
 
 ```
 
@@ -360,22 +367,44 @@ edges <- pe_ef |>
       op == "~~" & lhs != rhs ~ "none",  # covariance
       TRUE ~ "last"                       # regressions/loadings
     ),
-    curvature = if_else(op == "~~" & lhs != rhs, 50, NA_real_),
+    # Straight: the two correlated nodes sit side by side with nothing
+    # between them, unlike the arcs needed in the main SEM figure.
+    curvature = NA_real_,
     linetype  = if_else(op == "~~" & lhs != rhs, 2, 1),
+    # Significance stars on loadings, regressions and covariances between
+    # distinct variables -- the validity coefficient is a covariance, so it
+    # needs them. Variance loops (lhs == rhs) stay unstarred.
     label = case_when(
-      op %in% c("~","=~") ~ sprintf("%.2f%s", std.all,
+      op %in% c("~","=~") | (op == "~~" & lhs != rhs) ~ sprintf("%.2f%s", std.all,
         case_when(pvalue < .001 ~ "***",
                          pvalue < .01  ~ "**",
                          pvalue < .05  ~ "*", TRUE ~ "")),
       TRUE ~ sprintf("%.2f", std.all)
-    )
+    ),
+    # Exogenous factors (and the observed criterion) have a standardised
+    # variance of exactly 1 by construction, so the label carries no
+    # information and sits confusingly close to the loading labels. Residual
+    # variances of the indicators are informative and are kept.
+    label = if_else(op == "~~" & lhs == rhs & abs(std.all - 1) < 1e-6, "", label)
   ) 
 
 layout_ef <- as.matrix(read_excel("sem/layouts/ef_sem_layout.xlsx", col_names = FALSE))
 layout_ef[layout_ef == ""] <- NA
-# Spec A has no age predictor, so drop the age cell the spreadsheet
-# still carries (done here rather than editing the shared asset).
+# The spreadsheet carries an age cell and places MEFS among the indicators.
+# MEFS is now a separate correlated variable rather than an indicator, so it
+# takes the slot age used to occupy, on the opposite side of the factor from
+# the three LEVANTE tasks. Done here rather than editing the shared asset.
 layout_ef[layout_ef == "age"] <- NA
+layout_ef[layout_ef == "mefs"] <- NA
+layout_ef[1, 3] <- "mefs"
+# The spreadsheet spaced four indicators as 1, 2, _, 4, 5. With MEFS no longer
+# an indicator that leaves a stranded blank between Memory and Same and
+# Different, so respace the three remaining tasks evenly and symmetrically
+# about the factor.
+layout_ef[7, ] <- NA
+layout_ef[7, 1] <- "hf"
+layout_ef[7, 3] <- "mg"
+layout_ef[7, 5] <- "sds"
 
 # checks
 in_layout_ef <- na.omit(unique(c(layout_ef)))
@@ -387,8 +416,8 @@ g_ef <- tidySEM::prepare_graph(
   nodes = nodes,
   layout = t(layout_ef),
   text_size = 3.6,
-  rect_width = 7, rect_height = 3.5,
-  ellipses_width = 7, ellipses_height = 3.5,
+  rect_width = 9, rect_height = 4,
+  ellipses_width = 9.5, ellipses_height = 4.5,
   variance_height = 2.5, variance_width = 2,
   arrow_angle = 15, arrow_length = .2,
   var_arrow_angle = 15, var_arrow_length = .1,
@@ -433,7 +462,9 @@ lang_wide_scores <- prep_sem(task_scores, lang_tasks)
 #| dependson: prep-sem-lang
 # model
 cfa_lang <-  '
-Language =~ swr + sre + pa + trog + vocab
+Language =~ trog + vocab
+ROAR     =~ swr + sre + pa
+Language ~~ ROAR
 '
 
 fit_lang <- cfa(cfa_lang, data = lang_wide_scores,
@@ -444,25 +475,31 @@ fm_lang <- fitMeasures(fit_lang)
 
 # standarised loadings
 load_tab_lang <- pe_lang |>
-  filter(op == "=~", lhs == "Language",
+  filter(op == "=~", lhs %in% c("Language","ROAR"),
          rhs %in% c("swr","sre","pa","trog","vocab")) |>
   select(rhs, std.all) |>
   deframe()
+
+# the validity coefficient: LEVANTE Language factor with the ROAR factor
+r_lang_roar <- pe_lang |>
+  filter(op == "~~", lhs == "Language", rhs == "ROAR") |>
+  pull(std.all) |> as.numeric()
 ```
 
 ```{r sem-external-agecontrol}
 #| dependson: sem-lang
 
-# Spec C: age regressed on every indicator, so the factor is estimated from what
-# remains once age-related growth is removed from each task. This is the control
-# that tests whether convergence with the external criterion (MEFS, ROAR) is
-# genuine or merely both measures rising with age across a 5-13 year span.
-# Same df as spec A within each domain, so the two are directly comparable.
-cfa_ef_c <- paste("EF =~ hf + mg + sds + mefs",
+# Spec C: age regressed on every indicator, so each factor is estimated from
+# what remains once age-related growth is removed from each task. This is the
+# control that tests whether convergence with the external criterion is genuine
+# or merely both measures rising with age across a 5-13 year span. Same df as
+# the uncontrolled models within each domain, so they are directly comparable.
+cfa_ef_c <- paste("EF =~ hf + mg + sds", "EF ~~ mefs",
                   paste(paste0(c("hf","mg","sds","mefs"), " ~ age"), collapse = "\n"),
                   sep = "\n")
-cfa_lang_c <- paste("Language =~ swr + sre + pa + trog + vocab",
-                    paste(paste0(c("swr","sre","pa","trog","vocab"), " ~ age"),
+cfa_lang_c <- paste("Language =~ trog + vocab", "ROAR =~ swr + sre + pa",
+                    "Language ~~ ROAR",
+                    paste(paste0(c("trog","vocab","swr","sre","pa"), " ~ age"),
                           collapse = "\n"),
                     sep = "\n")
 
@@ -471,30 +508,26 @@ fit_ef_c   <- cfa(cfa_ef_c,   data = ef_wide_scores,
 fit_lang_c <- cfa(cfa_lang_c, data = lang_wide_scores,
                   estimator = "MLR", std.lv = TRUE, missing = "fiml")
 
-lambda_of <- function(fit, factor_name) {
+# The validity coefficient is now the correlation between the LEVANTE factor and
+# the external criterion, rather than the criterion's loading on a factor it
+# helped define.
+validity_r <- function(fit, lhs_name, rhs_name) {
   parameterEstimates(fit, standardized = TRUE) |>
-    filter(op == "=~", lhs == factor_name) |>
-    select(rhs, std.all)
+    filter(op == "~~", lhs == lhs_name, rhs == rhs_name) |>
+    pull(std.all) |> as.numeric()
 }
 
-task_labels <- c(
-  hf = "Hearts and Flowers", mg = "Memory", sds = "Same and Different",
-  mefs = "MEFS (external)", swr = "ROAR-Word (external)",
-  sre = "ROAR-Sentence (external)", pa = "ROAR-Phoneme (external)",
-  trog = "Sentence Understanding", vocab = "Vocabulary"
-)
-
-ext_loadings <- bind_rows(
-  full_join(lambda_of(fit_ef, "EF"), lambda_of(fit_ef_c, "EF"),
-            by = "rhs", suffix = c("_a", "_c")) |> mutate(Domain = "Executive Function"),
-  full_join(lambda_of(fit_lang, "Language"), lambda_of(fit_lang_c, "Language"),
-            by = "rhs", suffix = c("_a", "_c")) |> mutate(Domain = "Language")
+ext_validity <- tibble(
+  Domain = c("Executive Function", "Language"),
+  Criterion = c("MEFS", "ROAR battery"),
+  `Without age control` = c(validity_r(fit_ef, "EF", "mefs"),
+                            validity_r(fit_lang, "Language", "ROAR")),
+  `With age control`    = c(validity_r(fit_ef_c, "EF", "mefs"),
+                            validity_r(fit_lang_c, "Language", "ROAR"))
 ) |>
-  transmute(Domain, Task = unname(task_labels[rhs]),
-            `Without age control` = round(std.all_a, 2),
-            `With age control`    = round(std.all_c, 2))
+  mutate(across(where(is.double), \(x) round(x, 2)))
 
-# Fit of each specification, for the table's note.
+# Fit of each specification, quoted in the prose.
 ext_fit <- function(f) sprintf("CFI = %.3f, RMSEA = %.3f",
                                fitMeasures(f)[["cfi"]], fitMeasures(f)[["rmsea"]])
 ```
@@ -503,9 +536,9 @@ ext_fit <- function(f) sprintf("CFI = %.3f, RMSEA = %.3f",
 #| dependson: sem-lang
 nodes_lang <- get_nodes(fit_lang, columns = c("name","shape")) |>
   left_join(tibble(
-    name   = c("age","Language","trog","vocab","swr","sre","pa"),
-    pretty = c("Age (years)","Language",
-               "Sentence\nUnderstanding","Vocabulary",
+    name   = c("Language","ROAR","trog","vocab","swr","sre","pa"),
+    pretty = c("Language","ROAR",
+               "Sentence\nUnderst.","Vocabulary",
                "ROAR\nWord","ROAR\nSentence",
                "ROAR\nPhoneme")
   ), by = "name") |>
@@ -526,23 +559,39 @@ edges_lang <- pe_lang |>
       op == "~~" & lhs != rhs ~ "none",
       TRUE ~ "last"
     ),
-    curvature = if_else(op == "~~" & lhs != rhs, 50, NA_real_),
+    # Straight: the two correlated nodes sit side by side with nothing
+    # between them, unlike the arcs needed in the main SEM figure.
+    curvature = NA_real_,
     linetype  = if_else(op == "~~" & lhs != rhs, 2L, 1L),
+    # Stars on loadings and on covariances between distinct variables; the
+    # validity coefficient is a covariance, so it needs them.
     label = case_when(
-      op %in% c("~","=~") ~ sprintf("%.2f%s", std.all,
+      op %in% c("~","=~") | (op == "~~" & lhs != rhs) ~ sprintf("%.2f%s", std.all,
         case_when(pvalue < .001 ~ "***",
                          pvalue < .01  ~ "**",
                          pvalue < .05  ~ "*",
                          TRUE          ~ "")),
       TRUE ~ sprintf("%.2f", std.all)
-    )
+    ),
+    # Exogenous factors (and the observed criterion) have a standardised
+    # variance of exactly 1 by construction, so the label carries no
+    # information and sits confusingly close to the loading labels. Residual
+    # variances of the indicators are informative and are kept.
+    label = if_else(op == "~~" & lhs == rhs & abs(std.all - 1) < 1e-6, "", label)
   )
 
-layout_lang <- as.matrix(read_excel("sem/layouts/lang_sem_layout.xlsx", col_names = FALSE))
-layout_lang[layout_lang == ""] <- NA
-# Spec A has no age predictor, so drop the age cell the spreadsheet
-# still carries (done here rather than editing the shared asset).
-layout_lang[layout_lang == "age"] <- NA
+# The shared spreadsheet describes a single-factor model with age; this model
+# has two correlated factors and no age, so the layout is built here instead.
+# Rows become columns left-to-right once transposed below: LEVANTE indicators
+# on the left, the two factors in the middle, ROAR indicators on the right.
+layout_lang <- matrix(NA_character_, nrow = 7, ncol = 5)
+layout_lang[1, 1] <- "trog"
+layout_lang[1, 3] <- "vocab"
+layout_lang[4, 2] <- "Language"
+layout_lang[4, 4] <- "ROAR"
+layout_lang[7, 3] <- "swr"
+layout_lang[7, 4] <- "sre"
+layout_lang[7, 5] <- "pa"
 
 # checks
 in_layout_lang <- na.omit(unique(c(layout_lang)))
@@ -554,8 +603,8 @@ g_lang <- tidySEM::prepare_graph(
   nodes = nodes_lang,
   layout = t(layout_lang),
   text_size = 3.6,
-  rect_width = 8.5, rect_height = 3.5,
-  ellipses_width = 6, ellipses_height = 3.5,
+  rect_width = 10.5, rect_height = 4,
+  ellipses_width = 9, ellipses_height = 4.5,
   variance_height = 2.5, variance_width = 2,
   arrow_angle = 15, arrow_length = .2,
   var_arrow_angle = 15, var_arrow_length = .1,

@@ -1444,12 +1444,20 @@ concerns the two *external-validity* models in `_08-sem.qmd` (`fit_ef` and
 `fit_lang`).
 
 **These results have since been adopted in the manuscript.** Figures 7 and 8
-now show spec A (the measurement model, no age), and Table 8 reports the spec A
-and spec C loadings side by side as an age control. Spec B, which the
+now show the measurement models without age, and Table 8 reports the validity
+coefficient with and without the spec C age control. Spec B, which the
 manuscript previously used, has been dropped: the age slope it contributed is
 developmental-sensitivity evidence already covered by the age-models section,
 and it answers a developmental rather than a validity question. The comparison
 below is what motivated that change.
+
+The manuscript has since gone one step further than the specifications compared
+here. The external criterion is no longer an indicator of the LEVANTE factor but
+a separate construct correlated with it, so the reported quantity is a
+correlation between constructs rather than a loading (EF with MEFS .74; LEVANTE
+Language with a ROAR factor .87). See "MEFS as a latent variable" below for the
+reasoning. The loadings quoted in the comparisons that follow therefore describe
+the single-factor specifications, not the figures now in the paper.
 
 ### Data note: the MEFS score labels are wrong upstream
 
@@ -1576,7 +1584,7 @@ questions.
 
 | Spec | Specification | Question | Status in the manuscript |
 |---|---|---|---|
-| A | factor only, no age | baseline measurement model | Figures 7-8 |
+| A | factor only, no age | baseline measurement model | basis of Figures 7-8, with the criterion separated out |
 | B | `factor ~ age` | how much factor variance is developmental | dropped (was used previously) |
 | C | `indicator ~ age` for every indicator | does the factor cohere beyond shared age-related growth? | Table 8, age-controlled column |
 
@@ -1912,12 +1920,23 @@ specification is correct.
 
 ### MEFS as a latent variable
 
-In the manuscript, MEFS is an indicator of the same factor as the LEVANTE
-tasks. That specification *assumes* convergent validity rather than estimating
-it: the reported loading of .72 is MEFS's relation to a factor it helps define.
+**This analysis has since been adopted in the manuscript, in its reference
+form.** When it was written, MEFS was an indicator of the same factor as the
+LEVANTE tasks, which *assumed* convergent validity rather than estimating it:
+the loading then reported (.72) was MEFS's relation to a factor it helps
+define. The manuscript now separates the two, reports the correlation between
+them (.74) as the validity coefficient, and draws Figure 7 to match. The same
+change was made for Language, where a LEVANTE Language factor is correlated
+with a ROAR factor (.87).
 
-An alternative separates them, so that the quantity of interest is a
-correlation between two constructs:
+What the manuscript did *not* adopt is the correction for MEFS's unreliability
+explored below. The reference case here, `rxx = 1`, is equivalent to treating
+MEFS as an observed variable correlated with the factor, which is exactly what
+the manuscript now does; the sensitivity range is retained below as the record
+of why no correction was applied.
+
+The specification separates the two constructs so that the quantity of
+interest is a correlation between them:
 
 ```
 EF_levante =~ hf + mg + sds
@@ -2019,9 +2038,9 @@ glue(
 #### Interpretation
 
 Separating MEFS from the LEVANTE tasks yields a validity coefficient of about
-.74 without any correction for MEFS's measurement error, which is slightly above
-the .72 loading reported in the manuscript and requires no assumption about
-reliability. Correcting for unreliability moves the estimate upward throughout,
+.74 without any correction for MEFS's measurement error, slightly above the .72
+loading reported before this change and requiring no assumption about
+reliability. This uncorrected estimate is what the manuscript now reports. Correcting for unreliability moves the estimate upward throughout,
 reaching approximately .88 at the lowest reliability considered. The direction
 is therefore unambiguous even though the magnitude is not: the uncorrected
 estimate is a lower bound on the association between the LEVANTE executive
@@ -2035,6 +2054,165 @@ Note that the models including age fit considerably worse than those without,
 and give lower correlations throughout. This is the same pattern as spec B
 versus spec C above: constraining age to act through the factors does not
 describe these data well.
+
+## Task correlation heat map (proposed alternative to Figure 6)
+
+This section builds a correlation matrix for the nine core tasks, and adds the
+disattenuated matrix alongside, because the two together answer a question the
+observed matrix alone raises.
+
+**What "corrected for unreliability" means.** Observed correlations are pulled
+toward zero by measurement error, so a noisy task cannot correlate strongly with
+anything however strong the underlying relation. The classical correction for
+attenuation divides by the geometric mean of the two reliabilities,
+$r_{\text{corrected}} = r_{\text{observed}} / \sqrt{r_{xx} r_{yy}}$, giving the
+correlation that would be expected if both tasks were measured without error.
+The reliabilities used are the empirical marginal reliabilities from the IRT
+models -- the same values reported in Table 6 of the manuscript -- pooled across
+sites weighted by $N$: Pattern Matching .73, Shape Rotation .83, Hearts &
+Flowers .91, Memory .75, Same & Different .77, Sentence Understanding .77,
+Vocabulary .85, Math .92, Stories .63. This is the appropriate coefficient here,
+being an internal-consistency analogue derived from the item information
+function; a test-retest coefficient would absorb genuine developmental change
+and so over-correct.
+
+Three caveats. The correction only ever inflates, so the observed panel is a
+lower bound and the corrected panel an upper bound. A corrected value above 1 is
+impossible as a correlation and indicates the correction has overshot, either
+because the reliability estimates are slightly too low or because the true
+correlation is at the ceiling. And pooling reliabilities across sites assumes a
+common value per task, which is only approximately true -- Stories ranges from
+.56 to .80 across sites.
+
+**What to look for.** The tasks are ordered by the factor they belong to in
+Figure 6: Reasoning (Pattern Matching, Shape Rotation), Executive Function
+(Hearts & Flowers, Memory, Same & Different), Language (Sentence Understanding,
+Vocabulary), then Math and Stories. If the battery were strongly differentiated
+by domain, the within-domain blocks would be darker than the off-diagonal
+regions. They are not.
+
+```{r cor-heatmap}
+#| cache: false
+#| fig-width: 11
+#| fig-height: 5.5
+#| fig-cap: "Correlations among the nine core tasks, observed (left) and corrected for unreliability (right). Tasks are ordered by their factor in Figure 6."
+
+cor_tasks <- c("matrix", "mrot", "hf", "mg", "sds", "trog", "vocab", "math", "tom")
+# Axis labels (short, to fit) and the names task_rxx uses (must match exactly,
+# or the reliability lookup silently returns NA and the disattenuated panel
+# comes out blank for that task).
+cor_pretty <- c(matrix = "Pattern Matching", mrot = "Shape Rotation",
+                hf = "Hearts & Flowers", mg = "Memory", sds = "Same & Different",
+                trog = "Sentence Underst.", vocab = "Vocabulary",
+                math = "Math", tom = "Stories")
+cor_rxx_key <- c(matrix = "Pattern Matching", mrot = "Shape Rotation",
+                 hf = "Hearts & Flowers", mg = "Memory", sds = "Same & Different",
+                 trog = "Sentence Understanding", vocab = "Vocabulary",
+                 math = "Math", tom = "Stories")
+# task_rxx labels tasks by their pretty name, with the name left blank on
+# repeated site rows, so carry it down before aggregating.
+rxx_by_task <- task_rxx |>
+  mutate(task = na_if(trimws(task), "")) |>
+  tidyr::fill(task, .direction = "down") |>
+  filter(!is.na(empirical_rxx), !is.na(n)) |>
+  group_by(task) |>
+  summarise(rxx = weighted.mean(empirical_rxx, n), .groups = "drop")
+
+pretty_to_rxx <- setNames(rxx_by_task$rxx, rxx_by_task$task)
+rxx_vec <- pretty_to_rxx[unname(cor_rxx_key[cor_tasks])]
+stopifnot(!anyNA(rxx_vec))   # catch any future label mismatch loudly
+names(rxx_vec) <- cor_tasks
+
+obs <- cor(wide_scores[cor_tasks], use = "pairwise.complete.obs")
+dis <- obs / sqrt(outer(rxx_vec, rxx_vec))
+
+to_long <- function(m, panel) {
+  as.data.frame(as.table(m)) |>
+    setNames(c("row", "col", "r")) |>
+    mutate(panel = panel,
+           row = factor(as.character(row), levels = cor_tasks),
+           col = factor(as.character(col), levels = cor_tasks))
+}
+
+cor_long <- bind_rows(to_long(obs, "Observed"),
+                      to_long(dis, "Corrected for unreliability")) |>
+  mutate(panel = factor(panel, levels = c("Observed", "Corrected for unreliability"))) |>
+  # lower triangle only: the upper half is redundant and the diagonal is 1 by
+  # construction (and > 1 once disattenuated, which would mislead)
+  filter(as.integer(row) > as.integer(col)) |>
+  mutate(shown = pmin(r, 1),
+         lab = sprintf("%.2f", r))
+
+ggplot(cor_long, aes(x = col, y = row, fill = shown)) +
+  facet_wrap(vars(panel)) +
+  geom_tile(colour = "white", linewidth = 0.9) +
+  geom_text(aes(label = lab, colour = shown > 0.62), size = 3, show.legend = FALSE) +
+  # One hue, light to dark. A diverging scale would be wrong here: every value
+  # is positive, so there is no meaningful midpoint to diverge around.
+  scale_fill_gradient(low = "#F7FBFF", high = "#08519C", limits = c(0, 1),
+                      name = "r", breaks = c(0, .25, .5, .75, 1)) +
+  scale_colour_manual(values = c(`FALSE` = "grey10", `TRUE` = "white")) +
+  scale_x_discrete(labels = cor_pretty, drop = FALSE) +
+  scale_y_discrete(labels = cor_pretty, limits = rev(cor_tasks), drop = FALSE) +
+  labs(x = NULL, y = NULL) +
+  coord_fixed() +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1),
+        panel.grid = element_blank(),
+        legend.position = "right",
+        strip.text = element_text(face = "bold"))
+```
+
+```{r cor-heatmap-summary}
+#| cache: false
+
+ef <- c("hf", "mg", "sds")
+within_ef  <- obs[ef, ef][upper.tri(obs[ef, ef])]
+all_off    <- obs[upper.tri(obs)]
+tibble(
+  quantity = c("within-EF pairs (observed)", "all pairs (observed)",
+               "within-EF pairs (disattenuated)"),
+  min = c(min(within_ef), min(all_off), min(dis[ef, ef][upper.tri(dis[ef, ef])])),
+  median = c(median(within_ef), median(all_off), median(dis[ef, ef][upper.tri(dis[ef, ef])])),
+  max = c(max(within_ef), max(all_off), max(dis[ef, ef][upper.tri(dis[ef, ef])]))
+) |>
+  mutate(across(where(is.double), \(x) round(x, 2)))
+
+round(rxx_vec, 2)
+```
+
+#### Interpretation
+
+**The matrix does not show domain structure.** Observed correlations run from
+.12 to .70 with a median of .52, and the within-domain blocks are not darker
+than the rest. The three executive function tasks correlate .24 to .45 with each
+other, while several cross-domain pairs are higher -- Pattern Matching with Math
+.66, Sentence Understanding with Stories .70.
+
+**That is not a reliability artefact, and the reason matters.** Hearts & Flowers
+has an empirical reliability of .91, among the highest in the battery, so its
+low correlations cannot be attributed to measurement error. Corrected for
+unreliability it still correlates only .28 with Same & Different and .16 with
+Stories. Memory and Same & Different, by contrast, cohere reasonably once
+corrected (.59). The within-domain weakness is therefore specific to Hearts &
+Flowers rather than general to executive function measurement here.
+
+**The cross-domain correlations are genuinely high at the construct level.**
+Once disattenuated, Pattern Matching correlates .83 with Sentence Understanding
+and .86 with Stories, and Sentence Understanding with Stories reaches 1.01 --
+that is, indistinguishable. Values above 1 are an artefact of correcting with
+imperfect reliability estimates, but they indicate near-collinearity. This is the
+same message as the .94 Reasoning--Executive Function factor correlation and the
+ECV of .91 reported in the bifactor appendix.
+
+**Implication for the presentation choice.** Replacing Figure 6 with this matrix
+does not avoid a difficult result; it substitutes one for another. The SEM
+partially masks the Hearts & Flowers problem, because that task loads .50 on the
+factor, which reads as acceptable. The heat map makes a .24 sitting beside a .70
+immediately visible, and a reader will ask about it. The choice is therefore
+between defending high inter-factor correlations and weak fit, or explaining why
+the executive function tasks do not cohere and why one of them is an outlier.
+Both are real features of these data.
 
 ## Reproducibility
 

@@ -65,11 +65,19 @@ library(tidySEM) # needed on the search path: plot.sem_graph is neither exported
 # labels clear of their node and widen the panel to match.
 # Hu & Bentler's (1999) conventional cut-offs. Computed rather than asserted so
 # the verdict cannot go stale if a model is respecified and refitted.
-fit_verdict <- function(cfi, rmsea, cfi_cut = .95, rmsea_cut = .06) {
-  ok_c <- unname(cfi) >= cfi_cut; ok_r <- unname(rmsea) <= rmsea_cut
+fit_verdict <- function(cfi, rmsea, cfi_cut = .95, rmsea_cut = .06, tol = .005) {
+  cfi <- unname(cfi); rmsea <- unname(rmsea)
+  ok_c <- cfi >= cfi_cut; ok_r <- rmsea <= rmsea_cut
+  # A miss of a thousandth is not the same as a miss of two hundredths, so
+  # distinguish a marginal shortfall from a clear one rather than collapsing
+  # both into "met neither".
+  near_c <- !ok_c && (cfi_cut - cfi) <= tol
+  near_r <- !ok_r && (rmsea - rmsea_cut) <= tol
   if (ok_c && ok_r) "met conventional thresholds"
   else if (ok_c) "met the conventional CFI threshold but not the RMSEA threshold"
   else if (ok_r) "met the conventional RMSEA threshold but not the CFI threshold"
+  else if (near_c) "fell marginally short of the conventional CFI threshold and more clearly short of the RMSEA threshold"
+  else if (near_r) "fell short of the conventional CFI threshold and marginally short of the RMSEA threshold"
   else "met neither conventional threshold"
 }
 
@@ -213,7 +221,7 @@ Although we are interested in using psychometric models to create comparable sco
 
 In what follows, we begin by describing the nine LEVANTE core tasks, organized by construct. We then discuss the process of translation and adaptation that produced the Spanish and German versions of these tasks from the original English source. Next we describe our pilot data collection. We subsequently present our IRT-based scoring techniques and the results of multi-group comparison, in some cases after selectively removing items that show poor psychometric properties. Using scores from these analyses, we then present evidence on the reliability and validity of the tasks, noting that many are still under development and that we expect their psychometric properties to improve as items are iteratively refined and more data are collected.
 
-We end by discussing future plans for further internationalization and downward extension of the tasks (i.e., adapting them for younger children). Critically, LEVANTE embraces open science values, aiming to create measures and data that are permissively licensed and reusable and extensible by the international research community. These values address our final challenge posed above: the aim of LEVANTE is to minimize barriers to reuse, accelerating progress towards a global science of learning and development. 
+We end by discussing future plans for further internationalization and downward extension of the tasks (i.e., adapting them for younger children). Critically, LEVANTE embraces open science values, aiming to create measures and data that are permissively licensed and reusable and extensible by the international research community. These values address our final challenge posed above: the aim of LEVANTE is to minimize barriers to reuse, accelerating progress toward a global science of learning and development. 
 
 {{< include _02-scores.qmd >}}
 
@@ -221,11 +229,11 @@ We end by discussing future plans for further internationalization and downward 
 
 ## General task properties
 
-The LEVANTE core tasks are nine brief behavioral assessments, spanning five constructs, that can be delivered in a web browser on a tablet or laptop, with responses made via touchscreen, keyboard, or mouse. Because administration formats vary, the tasks prioritize response accuracy rather than reaction time, and impose no time limit on any individual trial. Reaction time is nonetheless recorded for every task, although trials requiring multiple responses -- sequence reproduction in Memory, the multi-select blocks of Same and Different, and number-line placement in Math -- yield per-response timings rather than a single trial-level reaction time. The tasks are deliberately designed for simplicity and clarity so that the same measure remains accessible to children across the full 5--12 year range, which is a challenge common to every construct we assess. With only modest exceptions, nearly all follow a multi-alternative forced-choice format (up to four options) and use colored illustrations.[^1] This uniformity of format means that in most cases, instructions can be short and easy to understand, minimizing delays when the tasks are given in sequence as a battery. @fig-tasks shows screenshots from each of the tasks. Below we briefly present each task.
+The LEVANTE core tasks are nine brief behavioral assessments, spanning six constructs, that can be delivered in a web browser on a tablet or laptop, with responses made via touchscreen, keyboard, or mouse. Because administration formats vary, the tasks prioritize response accuracy rather than reaction time, and impose no time limit on any individual trial. Reaction time is nonetheless recorded for every task, although trials requiring multiple responses -- sequence reproduction in Memory, the multi-select blocks of Same and Different, and number-line placement in Math -- yield per-response timings rather than a single trial-level reaction time. The tasks are deliberately designed for simplicity and clarity so that the same measure remains accessible to children across the full 5--12 year range, which is a challenge common to every construct we assess. With only modest exceptions, nearly all follow a multi-alternative forced-choice format (up to four options) and use colored illustrations.[^1] This uniformity of format means that in most cases, instructions can be short and easy to understand, minimizing delays when the tasks are given in sequence as a battery. @fig-tasks shows screenshots from each of the tasks. Below we briefly present each task.
 
 [^1]: The vocabulary task uses photographs, and the math task shows only text.
 
-![Screenshots from each of the nine LEVANTE core tasks. Top row, from left to right: Hearts & Flowers, Same & Different, Memory; middle row: Math, Pattern Matching, Shape Rotation; bottom row: Sentence Understanding, Vocabulary, Stories.](display/tasks_updated.png){#fig-tasks width="90%"}
+![Screenshots from each of the nine LEVANTE core tasks. Top row, from left to right: Hearts and Flowers, Same and Different, Memory; middle row: Math, Pattern Matching, Shape Rotation; bottom row: Sentence Understanding, Vocabulary, Stories.](display/tasks_updated.png){#fig-tasks width="90%"}
 
 ### Design principles
 
@@ -244,7 +252,7 @@ principles.
    never hurried on a given item, though some tasks cap the length of a session. Reaction time is
    recorded throughout.
 5. **Browser-based delivery.** Tasks run in a web browser on a tablet or laptop, in person or
-   remotely, without specialised equipment.
+   remotely, without specialized equipment.
 6. **Open licensing.** Tasks are built from permissively licensed materials and released for reuse,
    with no commercial or licensing constraints.
 7. **Cross-cultural applicability.** Content is chosen and illustrated to be interpretable across
@@ -290,7 +298,7 @@ dur_ft
 ```
 :::
 
-General task lengths are described below and average task durations from pilots (for both adaptive and non-adaptive versions) are given in @tbl-durations. Because of our interest in assessing children across a wide range of ages, we intentionally included items that we anticipated would be both very easy and very hard for children with the aim of deploying these items adaptively after we had gathered sufficient data for item calibration. We wanted to avoid frustration for children, however, so during pilot testing, we used a number of different stopping rules. In early iterations of pilot testing at the Colombia site (uniandes-co), we ended tasks after three consecutive incorrect responses; we later modified this rule to end tasks after six consecutive incorrect responses. These differences explain some of the disparate task lengths that are observed (e.g., very short task lengths for Pattern Matching in uniandes-co). 
+Average task durations from pilots, for both adaptive and non-adaptive versions, are given in @tbl-durations. Because of our interest in assessing children across a wide range of ages, we intentionally included items that we anticipated would be both very easy and very hard for children with the aim of deploying these items adaptively after we had gathered sufficient data for item calibration. We wanted to avoid frustration for children, however, so during pilot testing, we used a number of different stopping rules. In early iterations of pilot testing at the Colombia site (uniandes-co), we ended tasks after three consecutive incorrect responses; we later modified this rule to end tasks after six consecutive incorrect responses. These differences explain some of the disparate task lengths that are observed (e.g., very short task lengths for Pattern Matching in uniandes-co). 
 
 ## Language 
 
@@ -324,7 +332,7 @@ Cognitive flexibility -- one of the three core executive functions, alongside in
 
 ### Hearts and Flowers
 
-Inhibitory control is the ability to suppress a prepotent response in favour of a rule-governed one [@diamond2013]. The Hearts and Flowers task assesses inhibitory control and cognitive flexibility [@davidson2006]. We modeled the task design after the AMES tablet task version which has been tested in many global settings including Ghana and Côte d'Ivoire [@khan2024modeling; @ahmed2022directly]. Participants respond according to stimulus type: pressing a key on the same side as a heart (congruent rule), and on the opposite side for a flower (incongruent rule). The task includes three blocks: congruent (hearts only), incongruent (flowers only), and mixed (hearts and flowers). The congruent block serves as a baseline with minimal executive demands. The child responds by pressing one of two buttons. Participants in our version of the task are encouraged to respond as quickly as possible but -- due to variation in administration platform and in contrast to some versions of the task -- we did not provide a hard time limit on each trial. Both accuracy and reaction time are recorded; the treatment of slow responses is described in the Scoring section below.  
+Inhibitory control is the ability to suppress a prepotent response in favor of a rule-governed one [@diamond2013]. The Hearts and Flowers task assesses inhibitory control and cognitive flexibility [@davidson2006]. We modeled the task design after the AMES tablet task version which has been tested in many global settings including Ghana and Côte d'Ivoire [@khan2024modeling; @ahmed2022directly]. Participants respond according to stimulus type: pressing a key on the same side as a heart (congruent rule), and on the opposite side for a flower (incongruent rule). The task includes three blocks: congruent (hearts only), incongruent (flowers only), and mixed (hearts and flowers). The congruent block serves as a baseline with minimal executive demands. The child responds by pressing one of two buttons. Participants in our version of the task are encouraged to respond as quickly as possible but -- due to variation in administration platform and in contrast to some versions of the task -- we did not provide a hard time limit on each trial. Both accuracy and reaction time are recorded; the treatment of slow responses is described in the Scoring section below.  
 
 ### Memory
 
@@ -334,7 +342,7 @@ Working memory is the capacity to retain information over a short interval while
 
 ### Stories
 
-Theory of mind is the capacity to attribute desires, emotions, beliefs, and intentions to people, and to use those attributions to interpret and predict behaviour, including where what someone believes departs from what is actually the case [@wellman2001]. Relatively few social cognition instruments show good reliability and validity across not just early childhood but older children as well [cf. @heise2025]. Vignette-based assessments are also lengthy, which made it difficult to find one that would fit within our overall time budget. We chose to adapt and re-illustrate a storybook task developed by @sotomayor-enriquez2024 in which children hear stories with multiple social reasoning questions embedded, including questions about true and false beliefs, deception, and moral reasoning. Drawing on published data from this task, we selected items with good psychometric properties and strong potential for cross-cultural validity (e.g., stories commonly found across many cultures), and then supplemented these with additional questions assessing emotional reasoning. The result was a set of six stories, each with approximately five forced-choice (2 or 3 alternatives) social reasoning questions embedded within each story. We then developed two sets of alternative retest stories, in each case using the same structure as an existing story but substituting new details and characters. Most questions offer two response options, with some offering up to four. Accuracy and reaction time are both recorded.
+Theory of mind is the capacity to attribute desires, emotions, beliefs, and intentions to people, and to use those attributions to interpret and predict behavior, including where what someone believes departs from what is actually the case [@wellman2001]. Relatively few social cognition instruments show good reliability and validity across not just early childhood but older children as well [cf. @heise2025]. Vignette-based assessments are also lengthy, which made it difficult to find one that would fit within our overall time budget. We chose to adapt and re-illustrate a storybook task developed by @sotomayor-enriquez2024 in which children hear stories with multiple social reasoning questions embedded, including questions about true and false beliefs, deception, and moral reasoning. Drawing on published data from this task, we selected items with good psychometric properties and strong potential for cross-cultural validity (e.g., stories commonly found across many cultures), and then supplemented these with additional questions assessing emotional reasoning. The result was a set of six stories, each with approximately five forced-choice (2 or 3 alternatives) social reasoning questions embedded within each story. We then developed two sets of alternative retest stories, in each case using the same structure as an existing story but substituting new details and characters. Most questions offer two response options, with some offering up to four. Accuracy and reaction time are both recorded.
 
 ## Translation and adaptation
 
@@ -374,7 +382,7 @@ ggplot(ages, aes(x = age, fill = site_label)) +
 
 ## Colombia (uniandes-co-bogota and uniandes-co-rural)
 
-The Universidad de Los Andes team conducted school-based data collection at four schools in Bogotá and two public schools in the rural departments of Caquetá and Boyacá, selected for convenience from schools that had participated in previous projects with the university. In Bogotá, three of the participating schools belong to two family compensation funds and the fourth is managed by a charter-school organisation; across all sites, the schools primarily serve children from lower-middle and low-income families. By partnering with these schools, the research team oversaw data collection using a group assessment format on tablets provided by the team, with larger groups for older children and smaller groups for younger children. The sites collected data from `{r} n_users_site[["uniandes-co-bogota"]]` children in uniandes-co-bogota and `{r} n_users_site[["uniandes-co-rural"]]` children in uniandes-co-rural, aged 5--12 years. Due to time constraints for school-based administration, children typically completed a subset of the tasks. 
+The Universidad de Los Andes team conducted school-based data collection at four schools in Bogotá and two public schools in the rural departments of Caquetá and Boyacá, selected for convenience from schools that had participated in previous projects with the university. In Bogotá, three of the participating schools belong to two family compensation funds and the fourth is managed by a charter-school organization; across all sites, the schools primarily serve children from lower-middle and low-income families. By partnering with these schools, the research team oversaw data collection using a group assessment format on tablets provided by the team, with larger groups for older children and smaller groups for younger children. The sites collected data from `{r} n_users_site[["uniandes-co-bogota"]]` children in uniandes-co-bogota and `{r} n_users_site[["uniandes-co-rural"]]` children in uniandes-co-rural, aged 5--12 years. Due to time constraints for school-based administration, children typically completed a subset of the tasks. 
 
 ## Germany (mpieva-de)
 
@@ -400,14 +408,14 @@ age missing, `{r} ex_vars_age[["ex_age_missing"]]`;
 age below `{r} min_age` or above `{r} max_age`, `{r} ex_vars_age[["ex_age_interval"]]`;
 or retest gap below `{r} min_age_gap * 12` months, `{r} ex_vars_age[["ex_age_gap"]]`.
 The resulting final sample consists of a total of `{r} n_runs_scored_site[["all"]]` scored runs -- that is, one ability score per child per task administration, rather than per item or per trial -- from `{r} n_users_scored_site[["all"]]` unique children, ranging per task from `{r} min_task` to `{r} max_task`.
-Reflecting the pilot nature of this data collection, sample sizes and exclusion rates are imbalanced across sites: uniandes-co-bogota and uniandes-co-rural contribute the majority of the pooled sample reflecting that data collection began there first and expanded rapidly.
-We evaluate the impact of this imbalance by refitting the construct-validity model on equal-size-per-site subsamples and within individual sites; results are summarised in the Construct Validity section and reported in full in the Site-imbalance robustness check appendix.
+Reflecting the pilot nature of this data collection, sample sizes and exclusion rates are imbalanced across sites (@tbl-site-ns): uniandes-co-bogota and uniandes-co-rural contribute the majority of the pooled sample reflecting that data collection began there first and expanded rapidly.
+We evaluate the impact of this imbalance by refitting the full structural model on equal-size-per-site subsamples and within individual sites; results are summarized in the Internal structure section and reported in full in the Site-imbalance robustness check appendix.
 
 # Scoring
 
-Our goal for the psychometric modelling of the data obtained in each task was to extract administration-level ability scores (i.e., at the level of an assessment session) with the highest possible reliability and validity. To do so, we first conducted heuristic item screening to remove poorly functioning items, then fit a sequence of multi-group IRT models to the retained items to estimate latent ability scores. These analyses provided the foundation for the reliability, developmental, and validity results described in subsequent sections. 
+Our goal for the psychometric modeling of the data obtained in each task was to extract administration-level ability scores (i.e., at the level of an assessment session) with the highest possible reliability and validity. To do so, we first conducted heuristic item screening to remove poorly functioning items, then fit a sequence of multi-group IRT models to the retained items to estimate latent ability scores. These analyses provided the foundation for the reliability, developmental, and validity results described in subsequent sections. 
 
-For each task we distinguish between trials and IRT items (see @tbl-trial-irt-counts). Trials refer to individual questions that could be presented to the child (design-level count; e.g., 60 trials in the non-adaptive Hearts & Flowers task). For psychometric analyses, we define a smaller set of IRT items, where repeated trials of the same type are treated as interchangeable replicates, and practice or feedback trials are excluded. The responses to these IRT items are what enter the models, and it is these items that have estimated discrimination and difficulty parameters.
+For each task we distinguish between trials and IRT items (see @tbl-trial-irt-counts). Trials refer to individual questions that could be presented to the child (design-level count; e.g., 60 trials in the non-adaptive Hearts and Flowers task). For psychometric analyses, we define a smaller set of IRT items, where repeated trials of the same type are treated as interchangeable replicates, and practice or feedback trials are excluded. The responses to these IRT items are what enter the models, and it is these items that have estimated discrimination and difficulty parameters.
 
 ```{r item-counts}
 # get counts of items in IRT models
@@ -495,7 +503,7 @@ All IRT models were estimated in R using the `mirt` package [@mirt] via marginal
 
 Model selection was based on the Bayesian Information Criterion (BIC), with the final model for each task representing the most parsimonious combination of model type (Rasch, 2PL) and invariance constraints that adequately reproduced cross-site response patterns. Across domains, Rasch models generally provided the best fit, whereas 2PL models were preferred for Shape Rotation and Stories, indicating a greater differentiation of discrimination parameters across sites.
 
-As shown in @tbl-task-rxx, all but one task reached scalar invariance, indicating that both discrimination and difficulty parameters were comparable across sites. The exception was Vocabulary, which showed configural invariance, suggesting a shared latent construct with certain parameters differing across groups.
+All but one task reached scalar invariance, indicating that both discrimination and difficulty parameters were comparable across sites. The exception was Vocabulary, which showed configural invariance, suggesting a shared latent construct with certain parameters differing across groups.
 
 We additionally checked for measurement invariance across age and sex for tasks that demonstrated scalar invariance across sites. We fit the same set of models as described above, but with the grouping variable for invariance constraints set to age group (5--8 year olds vs. 9--12 year olds) or sex (female vs. male). For all eight tasks, the model with scalar invariance was preferred by BIC over the model with configural invariance for both age group and sex.
 
@@ -628,7 +636,7 @@ Across all nine tasks, ability scores were higher at older ages at all sites, in
 
 To quantify the age gradients, we fit ordinary least-squares models for each task predicting scaled ability scores (IRT units) from age with site fixed effects and an age by site interaction, allowing slopes to vary by site. Using the `marginaleffects` package [@marginaleffects], we extracted marginal estimates of age gradients. As summarized in @tbl-age-effects and @fig-age-slopes, age-related gradients were positive for all tasks and sites, indicating that older children on average performed better on every measure.
 
-For ease of interpretation, we calculated the zero-order correlations between age and IRT ability scores for each site. As seen in the right side of @tbl-age-effects, these correlations were almost uniformly positive (_r_ = `r age_cor_range[1]` to `r age_cor_range[2]`, with the exception of Same & Different in uniandes-co-rural, which has small sample size), of moderate magnitude across tasks, and broadly similar across sites. In sum, the results of the age-based analyses suggest that the tasks are sensitive to age-related differences and are likely suitable for deployment in longitudinal studies of developmental change.
+For ease of interpretation, we calculated the zero-order correlations between age and IRT ability scores for each site. As seen in the right side of @tbl-age-effects, these correlations were almost uniformly positive (_r_ = `r age_cor_range[1]` to `r age_cor_range[2]`, with the exception of Same and Different in uniandes-co-rural, which has small sample size), of moderate magnitude across tasks, and broadly similar across sites. In sum, the results of the age-based analyses suggest that the tasks are sensitive to age-related differences and are likely suitable for deployment in longitudinal studies of developmental change.
 
 
 ## Reliability 
@@ -694,7 +702,7 @@ We also examined whether LEVANTE tasks yield a consistent rank ordering of abili
 ```{r}
 #| label: fig-retest
 #| fig-cap: "Test-retest correlations per task (mpieva-de data only).
-#| *Note: Each point is one child, plotting ability on the first administration against ability on the second, coloured by that child's mean age across the two sessions. The dotted line marks exact agreement between sessions; the grey line is a linear fit. Each panel reports the test-retest correlation and the number of children.*"
+#| *Note: Each point is one child, plotting ability on the first administration against ability on the second, colored by that child's mean age across the two sessions. The dotted line marks exact agreement between sessions; the gray line is a linear fit. Each panel reports the test-retest correlation and the number of children.*"
 #| fig-width: 8
 #| fig-height: 9
 
@@ -725,25 +733,24 @@ ggplot(retest_wide_coretask, aes(run_1, run_2, colour = mean_age)) +
 
 Validity is the degree to which theory and empirical evidence support the interpretation of scores for their proposed use [@aera2014standards]. Validation is cumulative rather than settled by any single analysis, and different strands of evidence bear on different aspects of the question.
 
-Assessment of validity for the core tasks was challenging, in part because of the precise issues that motivated us to create the task battery in the first place. No readily available, internationalized measures existed to compare to many of our tasks. Thus, for validation evidence, we rely on the overall construct structure of the core task battery as well as the relations to our gold standard measures for literacy (ROAR-Word, ROAR-Sentence and ROAR-Phoneme) and executive function (MEFS).
+Assessment of validity for the core tasks was challenging, in part because of the precise issues that motivated us to create the task battery in the first place. No readily available, internationalized measures existed to compare to many of our tasks. Thus, for validation evidence, we rely on the internal structure of the core task battery as well as its relations to established measures of literacy (ROAR-Word, ROAR-Sentence and ROAR-Phoneme) and executive function (MEFS).
 
-### Construct validity
+### Internal structure
 
-We assessed construct validity using a structural equation model (SEM) specifying three multi-indicator latent factors—Reasoning, Executive Function, and Language—with each factor measured by its respective tasks and allowed to covary with Math and Stories (see @fig-semplot-core-tasks). Math and Stories were each measured by a single task, so neither admits a conventional multi-indicator latent variable. We therefore modelled Math as a single-indicator latent variable, fixing its residual variance at 1 -- *r*~xx~ using the task's empirical marginal reliability (*r*~xx~ = .92, averaged across sites weighted by *N*); because the scores entering the model are standardised, this expresses the construct net of measurement error on the same scale. We did not impose the equivalent correction on Stories, whose reliability is both lower and considerably more variable across sites (.56--.80 in @tbl-task-rxx). Applying the same correction at Stories' pooled reliability yields an inadmissible solution: the Language--Stories correlation rises to .97 and the latent covariance matrix is no longer positive definite. The correction is admissible only if Stories' reliability is assumed to be at least .64, which exceeds both its pooled estimate and the values observed at three of the four sites; at the lowest site value (.56) the implied correlation exceeds unity. Stories is therefore retained as an observed endogenous outcome, and its coefficients should be read as attenuated by measurement error. Age was specified to predict each of the latent factors, including Math, as well as the observed Stories outcome.
+We examined the battery's internal structure using a structural equation model (SEM) specifying three multi-indicator latent factors—Reasoning, Executive Function, and Language—with each factor measured by its respective tasks and allowed to covary with Math and Stories (see @fig-semplot-core-tasks). Math and Stories were each measured by a single task, so neither admits a conventional multi-indicator latent variable. We therefore modeled Math as a single-indicator latent variable, fixing its residual variance at 1 -- *r*~xx~ using the task's empirical marginal reliability (*r*~xx~ = .92, averaged across sites weighted by *N*); because the scores entering the model are standardized, this expresses the construct net of measurement error on the same scale. We did not impose the equivalent correction on Stories, whose reliability is both lower and considerably more variable across sites (.56--.80 in @tbl-task-rxx). Applying the same correction at Stories' pooled reliability yields an inadmissible solution: the Language--Stories correlation rises to .97 and the latent covariance matrix is no longer positive definite. The correction is admissible only if Stories' reliability is assumed to be at least .64, which exceeds both its pooled estimate and the values observed at three of the four sites; at the lowest site value (.56) the implied correlation exceeds unity. Stories is therefore retained as an observed endogenous outcome, and its coefficients should be read as attenuated by measurement error. Age was specified to predict each of the latent factors, including Math, as well as the observed Stories outcome.
 
 ```{r}
 #| label: fig-semplot-core-tasks
 #| dependson: sem-g-plot
 #| fig-cap: "Structural Equation Model for core tasks.
-#| *Note: Ovals represent latent factors; rectangles represent observed variables. Blue fill indicates latent factors, orange indicates the age predictor, and grey indicates observed indicators and outcomes. Green arrows represent factor loadings; blue arrows represent regression paths; grey dashed double-headed arrows represent residual variances and covariances (error terms). Values on paths are standardised coefficients.*"
+#| Note: Ovals are latent factors, rectangles observed variables, and orange marks the age predictor. Green arrows are factor loadings, blue arrows regression paths, and gray dashed arrows residual variances and covariances. Values are standardized coefficients."
 #| fig-width: 8
 #| fig-height: 9
 
 plot_sem_clear(g)
 ```
-\clearpage
 
-Overall model fit `r fit_verdict(fitMeasures(fit_cov_age)["cfi"], fitMeasures(fit_cov_age)["rmsea"])` (CFI $\geq$ .95, RMSEA $\leq$ .06) [@hu1999cutoff], CFI: `r round(fitMeasures(fit_cov_age)["cfi"], 3)`, RMSEA: `r round(fitMeasures(fit_cov_age)["rmsea"], 3)`, RMSEA p-value: `r pval_fmt(fitMeasures(fit_cov_age)["rmsea.pvalue"])`. Factor loadings supported the intended three-factor structure (convergent validity), and age showed positive associations with each domain. The high inter-factor correlations indicate that much of the variance is shared across domains. 
+Overall model fit `r fit_verdict(fitMeasures(fit_cov_age)["cfi"], fitMeasures(fit_cov_age)["rmsea"])` (CFI $\geq$ .95, RMSEA $\leq$ .06) [@hu1999cutoff], CFI: `r round(fitMeasures(fit_cov_age)["cfi"], 3)`, RMSEA: `r round(fitMeasures(fit_cov_age)["rmsea"], 3)`, RMSEA p-value: `r pval_fmt(fitMeasures(fit_cov_age)["rmsea.pvalue"])`. Factor loadings were substantial on all indicators, indicating that tasks within each domain share variance as intended. The high inter-factor correlations, however, indicate that much of that variance is shared across domains as well. 
 
 
 The three factors are strongly intercorrelated: Reasoning with Executive Function *r* = `r round(fc("reasoning ef", "r"), 2)`, 95% CI `r fc_ci("reasoning ef")`, Reasoning with Language `r round(fc("reasoning language", "r"), 2)` `r fc_ci("reasoning language")`, and Executive Function with Language `r round(fc("ef language", "r"), 2)` `r fc_ci("ef language")`.
@@ -753,15 +760,15 @@ This pattern of high correlations does not appear to be an artifact of the pilot
 
 Whether these high correlations reflect a single broad dimension or genuinely distinct but closely related domains is a question of factor structure that this pilot cannot settle, and that we take up in dedicated work in preparation. We therefore report the correlations here without adjudicating between those interpretations.
 
-### External validity
+### Convergent validity
 
-To assess external validity for the executive function tasks, we fit a single-factor executive function model with Hearts and Flowers, Memory, Same and Different, and the external measure, the Minnesota Executive Function Scale (MEFS), as indicators (@fig-semplot-ef). The model is a measurement model only; age is not included as a predictor, since the question here is whether the tasks and the external criterion mark out a common construct, and developmental effects are reported above. Model fit `r fit_verdict(fitMeasures(fit_ef)["cfi"], fitMeasures(fit_ef)["rmsea"])` (CFI $\geq$ .95, RMSEA $\leq$ .06) [@hu1999cutoff], CFI: `r round(fitMeasures(fit_ef)["cfi"], 3)`, RMSEA: `r round(fitMeasures(fit_ef)["rmsea"], 3)`, RMSEA p-value: `r pval_fmt(fitMeasures(fit_ef)["rmsea.pvalue"])`. Standardized loadings were moderate-to-strong: Hearts and Flowers = `r fmt(load_tab["hf"])`, Memory = `r fmt(load_tab["mg"])`, Same and Different = `r fmt(load_tab["sds"])`, MEFS = `r fmt(load_tab["mefs"])`, indicating that the MEFS aligns closely with the latent executive function construct.
+To assess convergent validity for the executive function tasks, we fit a model in which Hearts and Flowers, Memory and Same and Different define a latent executive function factor, and the external measure -- the Minnesota Executive Function Scale (MEFS) -- is allowed to correlate with that factor rather than loading on it (@fig-semplot-ef); the correlation between the two is then the validity coefficient, estimated without the external measure helping to define the construct it is meant to validate. The model is a measurement model only; age is not included as a predictor, since developmental effects are reported above. Model fit `r fit_verdict(fitMeasures(fit_ef)["cfi"], fitMeasures(fit_ef)["rmsea"])` (CFI $\geq$ .95, RMSEA $\leq$ .06) [@hu1999cutoff], CFI: `r round(fitMeasures(fit_ef)["cfi"], 3)`, RMSEA: `r round(fitMeasures(fit_ef)["rmsea"], 3)`, RMSEA p-value: `r pval_fmt(fitMeasures(fit_ef)["rmsea.pvalue"])`; both indices sit comfortably inside conventional bounds and the test of close fit is not rejected. Standardized loadings were moderate-to-strong: Hearts and Flowers = `r fmt(load_tab["hf"])`, Memory = `r fmt(load_tab["mg"])`, Same and Different = `r fmt(load_tab["sds"])`. The factor correlated `r fmt(r_ef_mefs)` with MEFS, indicating that the LEVANTE executive function tasks and the external measure converge closely on a common construct.
 
 ```{r}
 #| label: fig-semplot-ef
 #| dependson: sem-ef-plot
-#| fig-cap: "External validity evidence for Executive Function: SEM including the Minnesota Executive Function Scale (MEFS) as an external criterion measure.
-#| *Note: The oval represents the latent factor and rectangles represent observed task scores. Green arrows show factor loadings. Values on paths are standardised coefficients.*"
+#| fig-cap: "Convergent validity evidence for Executive Function.
+#| Note: Green arrows are factor loadings; the dashed arrow is the correlation between the LEVANTE factor and MEFS. Values are standardized coefficients."
 #| fig-height: 4
 
 plot_sem_clear(g_ef)
@@ -769,44 +776,43 @@ plot_sem_clear(g_ef)
 
 \clearpage
 
-We ran a similar model to determine the external validity of the language and literacy measures (Sentence Understanding and Vocabulary) against ROAR tasks, including measures of Phonological Awareness (ROAR-Phoneme), Single Word Reading (ROAR-Word) and Sentence Reading Efficiency (ROAR-Sentence). We fit a single latent Language factor with ROAR tasks plus Sentence Understanding and Vocabulary as indicators, specified as a measurement model without age (@fig-semplot-lang). Model fit `r fit_verdict(fm_lang["cfi"], fm_lang["rmsea"])` (CFI $\geq$ .95, RMSEA $\leq$ .06) [@hu1999cutoff], CFI: `r round(fm_lang["cfi"], 3)`, RMSEA: `r round(fm_lang["rmsea"], 3)`, RMSEA p-value: 
-`r pval_fmt(fitMeasures(fit_lang)["rmsea.pvalue"])`. Standardized loadings were moderate-to-strong: ROAR-Word = `r round(load_tab_lang["swr"], 2)`, ROAR-Sentence = `r round(load_tab_lang["sre"], 2)`, ROAR-Phoneme = `r round(load_tab_lang["pa"], 2)`, Sentence Understanding = `r round(load_tab_lang["trog"], 2)`, Vocabulary = `r round(load_tab_lang["vocab"], 2)`. 
+We ran a similar model to assess the convergent validity of the language and literacy measures (Sentence Understanding and Vocabulary) against ROAR tasks, including measures of Phonological Awareness (ROAR-Phoneme), Single Word Reading (ROAR-Word) and Sentence Reading Efficiency (ROAR-Sentence). We fit two correlated factors: a LEVANTE Language factor defined by Sentence Understanding and Vocabulary, and a ROAR factor defined by the three ROAR measures, with no age predictor (@fig-semplot-lang). As in the executive function model, the correlation between the two factors is the validity coefficient. Model fit `r fit_verdict(fm_lang["cfi"], fm_lang["rmsea"])` (CFI $\geq$ .95, RMSEA $\leq$ .06) [@hu1999cutoff], CFI: `r round(fm_lang["cfi"], 3)`, RMSEA: `r round(fm_lang["rmsea"], 3)`, RMSEA p-value: 
+`r pval_fmt(fitMeasures(fit_lang)["rmsea.pvalue"])`. Standardized loadings were strong on both factors: Sentence Understanding = `r round(load_tab_lang["trog"], 2)`, Vocabulary = `r round(load_tab_lang["vocab"], 2)` on the LEVANTE Language factor, and ROAR-Word = `r round(load_tab_lang["swr"], 2)`, ROAR-Sentence = `r round(load_tab_lang["sre"], 2)`, ROAR-Phoneme = `r round(load_tab_lang["pa"], 2)` on the ROAR factor. The two factors correlated `r round(r_lang_roar, 2)`. 
 
 ```{r}
 #| label: fig-semplot-lang
 #| dependson: sem-lang-plot
-#| fig-cap: "External validity evidence for Language: SEM including the ROAR tasks as external criterion measures.
-#| *Note: The oval represents the latent factor and rectangles represent observed task scores. Green arrows show factor loadings. Values on paths are standardised coefficients.*"
-#| fig-height: 4
+#| fig-cap: "Convergent validity evidence for Language.
+#| Note: Green arrows are factor loadings; the dashed arrow is the correlation between the LEVANTE Language factor and the ROAR factor. Values are standardized coefficients."
+#| fig-height: 5
 
 plot_sem_clear(g_lang)
 ```
 
-Because both domains span ages 5 to 13, convergence with an external criterion could in principle reflect nothing more than two developmentally sensitive measures rising together. We therefore refitted both models with age regressed on every indicator, so that each factor is estimated only from the variance remaining once age-related growth is removed from each task (@tbl-ext-agecontrol). The two specifications have the same degrees of freedom within each domain and so are directly comparable, and the age-controlled specification fits markedly better for executive function (`r ext_fit(fit_ef_c)`, versus `r ext_fit(fit_ef)`) and essentially the same for Language (`r ext_fit(fit_lang_c)`, versus `r ext_fit(fit_lang)`). For Language, all five loadings remain substantial, so its convergence with the ROAR measures is not an artifact of shared developmental growth. For executive function the loadings attenuate considerably, most of all for Hearts and Flowers; the MEFS loading falls but remains moderate, indicating that executive function convergence is real but rests to a greater extent on age-related variance shared among its tasks. This control is deliberately conservative: across this age span, age-graded growth is part of the constructs themselves, so the age-controlled column is best read as a lower bound rather than a corrected estimate.
+Because both domains span ages 5 to 12, convergence with an external criterion could in principle reflect nothing more than two developmentally sensitive measures rising together. We therefore refitted both models with age regressed on every indicator, so that each factor is estimated only from the variance remaining once age-related growth is removed from each task (@tbl-ext-validity). The two specifications have the same degrees of freedom within each domain and so are directly comparable, and the age-controlled specification fits markedly better for executive function (`r ext_fit(fit_ef_c)`, versus `r ext_fit(fit_ef)`) and essentially the same for Language (`r ext_fit(fit_lang_c)`, versus `r ext_fit(fit_lang)`). For Language the coefficient is barely affected, falling from `r ext_validity[[3]][2]` to `r ext_validity[[4]][2]`, so convergence with the ROAR battery is not an artifact of shared developmental growth. For executive function it attenuates more, from `r ext_validity[[3]][1]` to `r ext_validity[[4]][1]`, indicating that convergence with the MEFS is real but rests to a greater extent on age-related variance shared among the tasks. This control is deliberately conservative: across this age span, age-graded growth is part of the constructs themselves, so the age-controlled column is best read as a lower bound rather than a corrected estimate.
 
 ```{r}
-#| label: tbl-ext-agecontrol
+#| label: tbl-ext-validity
 #| dependson: sem-external-agecontrol
-#| tbl-cap: "Standardised factor loadings for the external-validity models with and without an age control. *Note: The age-controlled specification regresses age on every indicator, so each factor is estimated from the variance remaining after age-related growth is removed from each task. External criterion measures are marked.*"
+#| tbl-cap: "Convergent validity coefficients. Note: Each coefficient is the correlation between the LEVANTE factor and the external criterion. The age-controlled specification regresses age on every indicator."
 
-ext_loadings |>
+ext_validity |>
   flextable() |>
   autofit() |>
-  merge_v(j = "Domain") |>
+  fontsize(size = 10, part = "all") |>
   align(j = c("Without age control", "With age control"), align = "center", part = "all") |>
-  bold(j = "Domain", bold = TRUE, part = "body") |>
-  valign(j = "Domain", valign = "top", part = "body")
+  bold(j = "Domain", bold = TRUE, part = "body")
 ```
 
 ### What the validity evidence establishes
 
-Three conclusions follow. First, the tasks measure something coherent. All loadings in @fig-semplot-core-tasks are substantial and significant, and both external criteria converge on their intended factors, indicating that the tasks hang together and align reasonably with established instruments.
+Three conclusions follow. First, the tasks measure their intended constructs coherently. Every loading in @fig-semplot-core-tasks is substantial and significant, and both external criteria correlate strongly with their corresponding LEVANTE factors -- `r fmt(r_ef_mefs)` for the MEFS and `r round(r_lang_roar, 2)` for the ROAR battery.
 
-Second, overall fit falls short of conventional thresholds. Given that the residual covariance structure is reproduced reasonably well (SRMR = `r round(fitMeasures(fit_cov_age)["srmr"], 3)`) and the loadings are strong throughout, the shortfall appears to lie in the specified relations among the factors rather than in the tasks themselves. We therefore defer the question of factor structure to dedicated work.
+Second, the domain-level measurement models fit well -- the executive function model meets both conventional thresholds comfortably (`r ext_fit(fit_ef)`) and the Language model meets the CFI threshold -- while the full model in @fig-semplot-core-tasks does not. Its CFI falls just below the threshold and its RMSEA more clearly above it. Fit therefore degrades only when the domains are combined in a single structure. Together with the residual covariance structure being well reproduced (SRMR = `r round(fitMeasures(fit_cov_age)["srmr"], 3)`) and strong loadings throughout, this locates the shortfall in the specified relations among the factors rather than in the tasks themselves. We therefore defer the question of factor structure to dedicated work.
 
-Third, the two external-validity models differ in strength. Language coheres independently of age and converges with the ROAR measures, so it is the more strongly evidenced of the two. Executive Function is less secure: its coherence rests substantially on age-related variance shared among its tasks, and its convergence with the MEFS is correspondingly weaker than the loading in @fig-semplot-ef suggests on its own. Strengthening the EF measures is a priority for the next wave.
+Third, the two convergent-validity models differ in strength. Language's convergence with the ROAR battery is largely unaffected by partialling age out of every indicator, falling only from `r ext_validity[[3]][2]` to `r ext_validity[[4]][2]`, so it is the more strongly evidenced of the two. Executive function's convergence with the MEFS attenuates more, from `r ext_validity[[3]][1]` to `r ext_validity[[4]][1]`, so it rests to a greater extent on age-related variance shared among the tasks; strengthening those measures is a priority for the next wave.
 
-Taken together, these results provide an initial measurement foundation, indicate where it is weakest, and leave the organisation of the constructs to dedicated work.
+Taken together, these results establish an initial measurement foundation for the battery, identify where it needs strengthening, and leave the organization of the constructs to dedicated work.
 
 \clearpage
 
@@ -814,7 +820,7 @@ Taken together, these results provide an initial measurement foundation, indicat
 
 Adaptive administration serves the design principle of a feasible total duration. A fixed form long enough to measure the full 5--12 range precisely would exceed the battery's one-hour budget, whereas computer adaptive testing obtains comparable precision from far fewer items by selecting items matched to each child's current ability estimate.
 
-We have already adapted and piloted several of the LEVANTE core tasks as computer adapted versions, primarily in the mpieva-de and western-ca pilot sites. To date, these include Same & Different, Math, Pattern Matching, Shape Rotation, Sentence Understanding, and Vocabulary.  These adaptive versions of the tasks maintain an ability score, $\theta$, as an estimate of the participant's skill level that is updated at the end of each trial. This updated $\theta$ is then used to select an item best suited to their estimated ability, which both improves test-taker experience and yields more information on participant skill per item, allowing for a shorter task with fewer items. See @fig-age-trends-cat for age-related ability trends in the tasks currently using the adaptive format. 
+We have already adapted and piloted several of the LEVANTE core tasks as computer adapted versions, primarily in the mpieva-de and western-ca pilot sites. To date, these include Same and Different, Math, Pattern Matching, Shape Rotation, Sentence Understanding, and Vocabulary.  These adaptive versions of the tasks maintain an ability score, $\theta$, as an estimate of the participant's skill level that is updated at the end of each trial. This updated $\theta$ is then used to select an item best suited to their estimated ability, which both improves test-taker experience and yields more information on participant skill per item, allowing for a shorter task with fewer items. See @fig-age-trends-cat for age-related ability trends in the tasks currently using the adaptive format. 
 
 The CAT tasks use an adaptive algorithm made available by the open source JavaScript library jsCat [@ma2025roar]. The present LEVANTE CAT implementation varies item difficulty and the lower asymptote -- the guessing floor introduced above -- while holding discrimination and the upper asymptote constant at 1; that is, items differ in difficulty and in the chance of success from guessing, but not in how sharply they discriminate between ability levels. Items are selected by maximum Fisher information, that is, by choosing the item whose response is most informative at the child's current ability estimate. Within a CAT session $\theta$ is updated by maximum likelihood, bounded at -6 and 6; this differs from the expected a posteriori (EAP) estimator used for the fixed-form scores reported elsewhere in this paper, which draws on a population prior that is not available mid-session. The LEVANTE CATs are configurable with respect to the initial value of theta and the conditions for ending the task. The starting $\theta$ is set at 0 for all CAT tasks currently in use, but could in principle be set according to the researcher's prior expectation of participant ability, for example, by using age as a proxy indicator of the initial ability estimate.
 
@@ -849,7 +855,7 @@ ggplot(cat_only, aes(x = age, y = score)) +
   theme(legend.position = "bottom")
 ```
 
-Standard errors of IRT ability estimates were generally comparable across adaptive and fixed-length versions; typical SE ≈ 0.4–0.8 (see @fig-se in appendices). In most tasks, the fixed-length forms yielded slightly lower SEs than the adaptive forms across the mid to high range of ability, whereas adaptive forms showed marginally lower SEs for a small number of children at the lowest ability levels. Given the small cell sizes in these extreme bands and the modest magnitude of differences, precision of ability estimates was broadly similar across administration modes. The gain is therefore in administration time rather than in precision. Median durations for the adaptive forms (@tbl-durations) ran at 38--59% of their fixed-form counterparts for five of the six adapted tasks -- Vocabulary 38%, Shape Rotation 40%, Math 44%, Sentence Understanding 48% and Same & Different 59% -- with Pattern Matching the exception at 94%, reflecting the longer time its items require. Comparable precision from roughly half the testing time is the practical case for adaptive administration.
+Standard errors of IRT ability estimates were generally comparable across adaptive and fixed-length versions; typical SE ≈ 0.4–0.8 (see @fig-se in appendices). In most tasks, the fixed-length forms yielded slightly lower SEs than the adaptive forms across the mid to high range of ability, whereas adaptive forms showed marginally lower SEs for a small number of children at the lowest ability levels. Given the small cell sizes in these extreme bands and the modest magnitude of differences, precision of ability estimates was broadly similar across administration modes. The gain is therefore in administration time rather than in precision. Median durations for the adaptive forms (@tbl-durations) ran at 38--59% of their fixed-form counterparts for five of the six adapted tasks -- Vocabulary 38%, Shape Rotation 40%, Math 44%, Sentence Understanding 48% and Same and Different 59% -- with Pattern Matching the exception at 94%, reflecting the longer time its items require. Comparable precision from roughly half the testing time is the practical case for adaptive administration.
 
 \clearpage
 
@@ -884,13 +890,13 @@ Given the preliminary nature of this validation, we highlight several limitation
 
 Our plan is for the core tasks presented here to become the backbone of the LEVANTE framework, in which sites around the world collaborate to collect longitudinal data measuring children's learning and development as well as the overlapping contexts in which these children develop. De-identified data collected using the tasks presented here flow into a shared repository, becoming part of a large-scale dataset that we hope will enable a wide variety of downstream investigations. The power of these data is that -- especially when combined with contextual data about children's caregivers, home environment, school, and community environment -- they allow analysis of the sources of developmental and contextual variability at global scale.
 
-Towards this goal, one strength of our approach here is that it easily accommodates future internationalization and adaptation. In fact, at the time of writing we are working on adaptations for two more languages (French and Dutch) and we intend to further broaden the set of languages for which the tasks are available. As part of this process, we have created a website for generating and reviewing translation materials. The LEVANTE researcher website documents the use of this platform and our ongoing language adaptation efforts: <https://researcher.levante-network.org>. 
+Toward this goal, one strength of our approach here is that it easily accommodates future internationalization and adaptation. In fact, at the time of writing we are working on adaptations for two more languages (French and Dutch) and we intend to further broaden the set of languages for which the tasks are available. As part of this process, we have created a website for generating and reviewing translation materials. The LEVANTE researcher website documents the use of this platform and our ongoing language adaptation efforts: <https://researcher.levante-network.org>. 
 
 Our current task set is designed for children ages 5--12, but we are currently pursuing downward extension of many of these tasks for children ages 2--4. By design, the forced choice, tablet-based format of our tasks makes them highly amenable to use with younger children [@frank2016]. In our downward extension work, we are adding easier items to each task, increasing the number of practice trials, and increasing the amount of instructions. We anticipate that not all tasks will be usable for all ages, but for at least the executive function and language tasks there is strong evidence of usability with children under age 5 [@davidson2006;@bishop1982;@long_ma_tan_silverman_frank_yeatman_2025]. 
 
 ## Conclusions
 
-In sum, we have taken steps here towards creating a core set of tasks for measuring children's learning and development. We hope that this work is the beginning, rather than the end, of a process of iterative refinement and growth that results in a common, open measurement toolkit for developmental science.
+In sum, we have taken steps here toward creating a core set of tasks for measuring children's learning and development. We hope that this work is the beginning, rather than the end, of a process of iterative refinement and growth that results in a common, open measurement toolkit for developmental science.
 
 \newpage
 
@@ -938,16 +944,16 @@ NOTHING WAS DELETED. _09-bifactor.qmd is intact in the repo and still runs
 (it needs mdl_3f/fit_3f/grab_fit from _08-sem.qmd, which are still built).
 To restore: un-comment the block below, changing {{\< and \>}} back to the
 normal shortcode delimiters, and put the main-text paragraph back in the
-Construct Validity section.
+Internal structure section.
 
 --- appendix heading, lead-in and include -------------------------------
 # Bifactor and Schmid-Leiman analysis of the core task battery {.appendix #apx-bifactor}
 
-Given the very high inter-factor correlations reported in the Construct Validity section, we investigated whether a bifactor structure -- a single general factor alongside domain-specific factors -- might better characterize the data. Unlike the main SEM in @fig-semplot-core-tasks, Math and Stories are treated here as indicators of the Reasoning and Language factors respectively, rather than as separate outcomes; this is the specification a bifactor decomposition requires, since every task must load on the general factor. Fit indices in this appendix are therefore not directly comparable with those in the main text.
+Given the very high inter-factor correlations reported in the Internal structure section, we investigated whether a bifactor structure -- a single general factor alongside domain-specific factors -- might better characterize the data. Unlike the main SEM in @fig-semplot-core-tasks, Math and Stories are treated here as indicators of the Reasoning and Language factors respectively, rather than as separate outcomes; this is the specification a bifactor decomposition requires, since every task must load on the general factor. Fit indices in this appendix are therefore not directly comparable with those in the main text.
 
 {{\< include _09-bifactor.qmd \>}}
 
---- main-text paragraph that summarised it (sat in Construct Validity) ---
+--- main-text paragraph that summarized it (sat in Internal structure) ---
 Given these high inter-factor correlations, we investigated whether a bifactor structure (i.e., a single general factor alongside domain-specific factors) might better characterize the data; see Appendix for the full analysis. That analysis uses its own specification, in which Math and Stories load on the Reasoning and Language factors rather than standing as separate outcomes, because a bifactor decomposition requires every task to load on the general factor; its fit indices are therefore not directly comparable with those reported here. A direct bifactor model produced an improper (Heywood-case) solution (@tbl-bifactor-fit-compare), which can have several possible causes (e.g., sampling variability or too few indicators per specific factor), but the pattern here converges with the model-free implied loadings (see Appendix: @tbl-analytic-g-loadings), consistent with specific factors carrying little variance beyond a dominant general factor. We therefore recovered general- and specific-factor loadings via a second-order model with a Schmid-Leiman transformation [@schmid1957development] (@tbl-bifactor-methods-comparison). Reasoning proved essentially indistinguishable from a general factor, while Executive Function and especially Language retained modestly more distinguishable variance. Explained common variance (ECV = .91) and omega-hierarchical ($\omega_{H}$ = .88) both exceeded conventional thresholds for treating the battery as substantially general-factor-dominated in practice [@reise2012rediscovery; @rodriguez2016evaluating] (@tbl-bifactor-indices), though our inter-factor correlations run higher than comparable estimates from a twin sample of Texas children (Reasoning–EF *r* = .84, EF–Language *r* = .76, Reasoning–Language *r* = .75; [@engelhardt2016]), particularly for Language. We note that comparative fit is not the basis for this characterization; bifactor models are known to exhibit elevated fitting propensity [@bonifay2017complexity; @bonifay2025reassessing], and our reading rests on the model-free implied loadings and variance-partitioning indices reported in Appendix A rather than on the fit comparison in Table A1.
 
 Also on restoring: _10-subsample-robustness.qmd's lead-in used to read
@@ -958,7 +964,7 @@ dominated pattern...'; both were reworded here to drop the dependency.
 
 # Site-imbalance robustness check {#apx-subsample}
 
-Sample sizes are imbalanced across the pilot sites (see Data filtering), which raises the concern that the correlated three-factor model's high inter-factor correlations could be an artifact of pooling over unevenly-sized, unevenly-composed sites rather than a genuine feature of the tasks. We evaluate this directly with two complementary checks: repeatedly refitting the three-factor model on equal-size-per-site subsamples, and refitting it separately within each individual site (no cross-site pooling at all). The full-sample estimates fell at or within the 95% interval of these robustness analyses.
+Sample sizes are imbalanced across the pilot sites (@tbl-site-ns), which raises the concern that the correlated three-factor model's high inter-factor correlations could be an artifact of pooling over unevenly-sized, unevenly-composed sites rather than a genuine feature of the tasks. We evaluate this directly with two complementary checks: repeatedly refitting the three-factor model on equal-size-per-site subsamples, and refitting it separately within each individual site (no cross-site pooling at all). The full-sample estimates fell at or within the 95% interval of these robustness analyses.
 
 {{< include _10-subsample-robustness.qmd >}}
 
