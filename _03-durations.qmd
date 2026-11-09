@@ -25,7 +25,7 @@ task_time_summary <- time_summary |>
             n_runs = n()) |>
   ungroup() |>
   mutate(across(contains("diff"), \(d) sprintf("%.2f", d))) |>
-  mutate(combined_diff = glue("{median_diff} [{min_diff}, {max_diff}]"),
+  mutate(combined_diff = median_diff,
          combined_trials = glue("{median_trials} [{min_trials}, {max_trials}]")) |>
   left_join(task_info)
 

@@ -4,7 +4,7 @@ mod_stats <- read_rds(here(pilots_dir, "02_scoring_outputs/mod_stats.rds"))
 task_rxx <- mod_stats |>
   rename(item_task = task) |>
   left_join(task_mods) |>
-  # filter(item_task %in% core_tasks) |>
+  filter(item_task %in% core_tasks) |>
   mutate(task_rxx = if_else(model_set == "by_language", lang_rxx, scalar_rxx)) |>
   select(item_task, task_model_set = model_set, task_itemtype = itemtype,
          task_invariance = invariance, task_rxx) |>
@@ -35,6 +35,7 @@ subgroup_rxx <- mod_subgroup_stats |>
   # filter(model_type == "singlegroup") |>
   # filter(group_var == "age_group") |>
   select(item_task = task, itemtype, invariance, group_var, rxx) |>
+  filter(item_task %in% core_tasks) |>
   unnest(rxx) |>
   pivot_wider(names_from = c(group_var, group), values_from = empirical_rxx,
               names_sep = "-") |>

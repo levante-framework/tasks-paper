@@ -8,3 +8,7 @@
 % visibly different spacing (e.g. "Future directions" sat 38pt above its first
 % paragraph while "Current status of the core tasks" sat at 21pt).
 \raggedbottom
+
+% flextable loads ulem, which by default redefines \emph as underlining.
+% normalem keeps \emph (markdown *italics*) italic.
+\PassOptionsToPackage{normalem}{ulem}
