@@ -1,5 +1,5 @@
 ---
-title: "Creation and validation of the LEVANTE core tasks: Internationalized measures of learning and development for children ages 5--12 years"
+title: "Creation and initial validation of the LEVANTE core tasks: Internationalized measures of learning and development for children ages 5--12 years"
 shorttitle: "LEVANTE Measures"
 
 metadata-files:
