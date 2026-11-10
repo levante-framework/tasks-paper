@@ -233,8 +233,6 @@ The LEVANTE core tasks are nine brief behavioral assessments, spanning six const
 
 [^1]: The vocabulary task uses photographs, and the math task shows only text.
 
-![Screenshots from each of the nine LEVANTE core tasks. Top row, from left to right: Hearts and Flowers, Same and Different, Memory; middle row: Math, Pattern Matching, Shape Rotation; bottom row: Sentence Understanding, Vocabulary, Stories.](display/tasks_updated.png){#fig-tasks width="90%"}
-
 ### Design principles
 
 Which measures to select for LEVANTE was guided by the criteria set out in @frank2025; the principles
@@ -263,6 +261,8 @@ principles.
 10. **A feasible total duration.** The battery is intended to be completed in approximately one
     hour, which motivated both the stopping rules used during piloting and the move to computer
     adaptive testing.
+
+![Screenshots from each of the nine LEVANTE core tasks. Top row, from left to right: Hearts and Flowers, Same and Different, Memory; middle row: Math, Pattern Matching, Shape Rotation; bottom row: Sentence Understanding, Vocabulary, Stories.](display/tasks_updated.png){#fig-tasks width="90%"}
 
 Tasks were implemented using jsPsych [@de-leeuw2015] in a common framework. Illustrations were produced by hand, while auditory stimuli were generated using AI-based voice synthesis tools (<https://elevenlabs.io>), which enabled rapid and iterative revisions without the need for rerecording. The tasks generally share a set of usability features including simple instructions, a small number of practice trials, and buttons to replay audio.
 
